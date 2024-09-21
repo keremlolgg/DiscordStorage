@@ -1,0 +1,6 @@
+﻿  Main.cpp
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\shared\wtypesbase.h(395,9): warning C4309: 'başlatılıyor': sabit değer kesildi
+  ('Main.cpp' kaynak dosyası derleniyor)
+  
+  LINK : /LTCG belirtildi ancak kod üretme gerekli değil; bağlayıcı performansını artırmak için /LTCG'yi bağlantı komut satırından kaldırın
+  DiscordDepolama.vcxproj -> C:\Users\KeremK\. Projeler\Vs 2022\Projeler\DiscordDepolama\bin\DiscordDepolama.exe
