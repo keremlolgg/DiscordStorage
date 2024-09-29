@@ -1,6 +1,11 @@
 ﻿#include <iostream>
 #include <fstream>
 #include <future>
+#include <cstdlib>
+#include <cstdio>
+#include <memory>
+#include <array>
+#include <filesystem>
 #include <CURL/curl/curl.h>
 #include <nlohmann/json.hpp>
 using namespace std;
@@ -9,8 +14,6 @@ using json = nlohmann::json;
 struct Response {
     std::string data;
 };
-std::vector<std::string> url_listesi;
-std::mutex url_listesi_mutex;
 vector<string> dosya_listesi(const std::string& yol) {
     vector<string> dosyalar;
     for (const auto& entry : std::filesystem::directory_iterator(yol)) {
@@ -19,6 +22,19 @@ vector<string> dosya_listesi(const std::string& yol) {
         }
     }
     return dosyalar;
+}
+std::string trimWhitespaceAndSpecialChars(const std::string& str) {
+    std::string result = str;
+
+    // Başındaki ve sonundaki boşlukları ve \r karakterlerini sil
+    result.erase(result.begin(), std::find_if(result.begin(), result.end(), [](unsigned char c) {
+        return !std::isspace(c) && c != '\r';
+        }));
+    result.erase(std::find_if(result.rbegin(), result.rend(), [](unsigned char c) {
+        return !std::isspace(c) && c != '\r';
+        }).base(), result.end());
+
+    return result;
 }
 std::string url_bul(const std::string& json_str) {
     std::string url;
@@ -35,15 +51,90 @@ std::string url_bul(const std::string& json_str) {
 
     return url;
 }
+std::string getFileHash(const std::string& filename) {
+    std::string command = "CertUtil -hashfile \"" + filename + "\" SHA256";
+    STARTUPINFOA startupInfo;
+    PROCESS_INFORMATION processInfo;
+    ZeroMemory(&startupInfo, sizeof(startupInfo));
+    ZeroMemory(&processInfo, sizeof(processInfo));
+    startupInfo.cb = sizeof(startupInfo);
+    startupInfo.dwFlags |= STARTF_USESTDHANDLES; 
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = TRUE;
+    sa.lpSecurityDescriptor = NULL;
+
+    HANDLE hReadPipe, hWritePipe;
+    if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
+        std::cerr << "Pipe oluşturulamadı! Hata kodu: " << GetLastError() << std::endl;
+        return "";
+    }
+    startupInfo.hStdOutput = hWritePipe;
+    startupInfo.hStdError = hWritePipe;
+    if (!CreateProcessA(NULL, const_cast<char*>(command.c_str()), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &startupInfo, &processInfo)) {
+        CloseHandle(hWritePipe);
+        CloseHandle(hReadPipe);
+        std::cerr << "Process oluşturulamadı! Hata kodu: " << GetLastError() << std::endl;
+        return "";
+    }
+    CloseHandle(hWritePipe);
+    std::array<char, 128> buffer;
+    std::string result;
+    DWORD bytesRead;
+    while (ReadFile(hReadPipe, buffer.data(), buffer.size() - 1, &bytesRead, NULL) && bytesRead > 0) {
+        buffer[bytesRead] = '\0'; 
+        result += buffer.data();
+    }
+    CloseHandle(hReadPipe);
+    WaitForSingleObject(processInfo.hProcess, INFINITE);
+    CloseHandle(processInfo.hProcess);
+    CloseHandle(processInfo.hThread);
+
+    std::ofstream outFile("result.txt");
+    if (outFile.is_open()) {
+        outFile << result;  // Tüm çıktıyı dosyaya yaz
+        outFile.close();
+    }
+    else {
+        std::cerr << "Dosya açılamadı!" << std::endl;
+        return "";
+    }
+
+    // Dosyadan ikinci satırı oku
+    std::ifstream inFile("result.txt");
+    std::string line;
+    std::string secondLine;
+
+    if (inFile.is_open()) {
+        int lineCount = 0;
+        while (std::getline(inFile, line)) {
+            lineCount++;
+            if (lineCount == 2) { // İkinci satırı bul
+                secondLine = line;
+                break;
+            }
+        }
+        inFile.close();
+    }
+    else {
+        std::cerr << "Dosya açılamadı!" << std::endl;
+        return "";
+    }
+    if (std::remove("result.txt") != 0) {
+        std::cerr << "Dosya silme hatası: result.txt" << std::endl;
+    }
+    // İkinci satırı döndür
+    return secondLine;
+}
+size_t write_data(void* buf, size_t size, size_t nmemb, FILE* userp) {
+    size_t written = fwrite(buf, size, nmemb, userp);
+    return written;
+}
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t total_size = size * nmemb;
     Response* response = static_cast<Response*>(userp);
     response->data.append(static_cast<char*>(contents), total_size);
     return total_size;
-}
-size_t write_data(void* buf, size_t size, size_t nmemb, FILE* userp) {
-    size_t written = fwrite(buf, size, nmemb, userp);
-    return written;
 }
 
 void dosya_sec(const vector<string>& dosyalar, std::string& secilen_dosya) {
@@ -92,7 +183,7 @@ int dosya_indir(const std::string& url, const std::string& dosya_adi) {
     curl_global_cleanup();
     return 0;
 }
-void dosya_gonder(const std::string& webhook_url, const std::string& dosya_yolu, const int& parca_no, const std::string& mesaj, const int& silme) {
+void dosya_gonder(const std::string& webhook_url, const std::string& dosya_yolu, const int& parca_no, const std::string& mesaj, const int& silme,const string& linkleridosyasi) {
     CURL* curl;
     CURLcode res;
 
@@ -139,14 +230,17 @@ void dosya_gonder(const std::string& webhook_url, const std::string& dosya_yolu,
             std::ofstream dosya2("gonderimlog.txt", std::ios::app);
             dosya2 << "Webhook Yanıtı: "<<response.data << std::endl;
             dosya2.close();
-            std::string url = url_bul(response.data);
+            string url = url_bul(response.data);
             if (!url.empty()) {
                 std::cout << "\033[1;34mBulunan URL: " << url << std::endl;
-                std::string url_entry = std::to_string(parca_no) + " " + url;
-                url_listesi.push_back(url_entry);
+                if(silme==1){
+                    std::ofstream dosya2(linkleridosyasi, std::ios::app);
+                    dosya2 << std::to_string(parca_no) + " " + url << std::endl;
+                    dosya2.close();
+                }
             }
             else {
-                std::cout << "URL bulunamadi." << std::endl;
+                std::cout << "URL bulunamadi. Lütfen gonderimlog.txt dosyasından hataya bakınız." << std::endl;
             }
         }
 
@@ -158,6 +252,9 @@ void dosya_gonder(const std::string& webhook_url, const std::string& dosya_yolu,
 }
 
 void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, const std::string& webhook_url, size_t parca_boyutu = mbsinir * 1024 * 1024) {
+    std::string linkler_txt = dosya_yolu + "_linkleri.txt";
+    int mevcut_parca_sayisi = 0;
+    string hash;
     std::ifstream dosya(dosya_yolu, std::ios::binary);
     if (!dosya) {
         std::cerr << "Dosya açılamadı: " << dosya_yolu << std::endl;
@@ -166,19 +263,43 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, const std::s
     dosya.seekg(0, std::ios::end);
     size_t dosya_boyutu = dosya.tellg();
     dosya.seekg(0, std::ios::beg);
-
     int toplam_parca = static_cast<int>((dosya_boyutu + parca_boyutu - 1) / parca_boyutu);
-
-    int parca_no = 1;
-    char* buffer = new char[parca_boyutu];
-    std::string linkler_txt = dosya_yolu + "_linkleri.txt";
-
-    std::ofstream temizle_txt(linkler_txt, std::ios::trunc);
-    if (!temizle_txt) {
-        std::cerr << "linkleri.txt dosyası temizlenemedi: " << linkler_txt << std::endl;
+    std::ifstream kontrol(linkler_txt);
+    if (kontrol) {
+        std::string son_satir;
+        getline(kontrol, son_satir);
+        getline(kontrol, son_satir);
+        getline(kontrol,hash);
+        if (trimWhitespaceAndSpecialChars(hash) == trimWhitespaceAndSpecialChars(getFileHash(dosya_yolu))) {
+            while (std::getline(kontrol, son_satir)) {
+                std::istringstream iss(son_satir);
+                int parca_sayisi;
+                std::string url;
+                if (iss >> parca_sayisi >> url) {
+                    mevcut_parca_sayisi = parca_sayisi;
+                }
+            }
+            cout << "\033[1;31mAynı dosya tespit edildi kaldığı yerden devam ediyor." << endl;
+        }
+        else {
+            cout << "\033[1;31mAynı isimde farklı bir dosya tespit edildi lütfen diğer dosyayı silin veya taşıyın." << endl;
+            kontrol.close();
+            dosya.close();
+            return;
+        }
+        kontrol.close();
+    } else {
+        std::ofstream dosya2(linkler_txt, std::ios::app);
+        dosya2 << toplam_parca << std::endl;
+        dosya2 << dosya_yolu << std::endl;
+        dosya2 << getFileHash(dosya_yolu) << endl;
+        dosya2.close();
     }
-    temizle_txt.close();
+
+    char* buffer = new char[parca_boyutu];
     cout << "\033[1;31mToplam yuklenecek parca sayisi. " << toplam_parca << endl;
+    int parca_no = mevcut_parca_sayisi + 1;
+    dosya.seekg(parca_boyutu * (mevcut_parca_sayisi), std::ios::beg);
     while (!dosya.eof()) {
         dosya.read(buffer, parca_boyutu);
         std::streamsize bytes_okunan = dosya.gcount();
@@ -194,22 +315,13 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, const std::s
         parca_dosyasi.close();
 
         std::string mesaj = dosya_yolu + "'nin parcasi No: " + std::to_string(parca_no);
-        dosya_gonder(webhook_url, parca_dosyasi_adi, parca_no, mesaj, 1);
-
+        dosya_gonder(webhook_url, parca_dosyasi_adi, parca_no, mesaj, 1,linkler_txt);
         parca_no++;
     }
 
-    std::ofstream dosya2(dosya_yolu + "_linkleri.txt", std::ios::app);
-    dosya2 << parca_no - 1 << std::endl;
-    dosya2 << dosya_yolu << std::endl;
-    for (const auto& url : url_listesi) {
-        dosya2 << url << std::endl;
-    }
-    dosya2.close();
-
     delete[] buffer;
     dosya.close();
-    dosya_gonder(webhook_url, linkler_txt, parca_no, dosya_yolu + "'nin indirme linkleri\nProgram linki: https://github.com/keremlolgg/DiscordStorage/releases/latest", 0);
+    dosya_gonder(webhook_url, linkler_txt, parca_no, dosya_yolu + "'nin indirme linkleri\nProgram linki: https://github.com/keremlolgg/DiscordStorage/releases/latest", 0,linkler_txt);
 }
 void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
     std::ifstream linkler_dosyasi(linkler_dosya_adi);
@@ -219,6 +331,7 @@ void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
     }
 
     int toplam_parca = 0;
+    string hash;
     std::string satir;
     std::string hedef_dosya_adi;
     std::vector<std::pair<int, std::string>> linkler;
@@ -237,7 +350,10 @@ void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
         std::cerr << "Hedef dosya adı okunamadı!" << std::endl;
         return;
     }
-
+    if (!std::getline(linkler_dosyasi, hash)) {
+        std::cerr << "Hash okunamadı okunamadı!" << std::endl;
+        return;
+    }
     while (std::getline(linkler_dosyasi, satir)) {
         std::istringstream iss(satir);
         int parca_numarasi;
@@ -299,6 +415,9 @@ void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
     }
 
     hedef_dosya.close();
+    if (getFileHash(hedef_dosya_adi) != hash) {
+        cout << "\033[1;31mOluşturulan dosya ile yüklenen dosya hashleri tutmuyor!" << endl;
+    }
 }
 
 int main() {
