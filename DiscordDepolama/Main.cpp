@@ -284,7 +284,7 @@ void create_channel(dpp::cluster& bot, const std::string& channel_name, const st
         .set_name(channel_name)
         .set_guild_id(guild_id);
 
-    if (category_id != "0") {
+    if (category_id != "category_id") {
         channel.set_parent_id(category_id); // Kategori ID'si varsa kanalı ona bağla
     }
 
@@ -690,7 +690,7 @@ int main() {
         j["BOT_TOKEN"] = "your token";
         j["guild_id"] = "your storage server";
         j["mbsinir"] = 23;
-        j["category_id"] = "0";
+        j["category_id"] = "category_id";
         update_json_and_save();
         cout << "JSON dosyası bulunmadı, oluşturuldu: " << "discord.json" << std::endl;
     }
@@ -705,9 +705,10 @@ int main() {
     while (true) {
         cout << "\033[1;31mProgram Sahibi Kerem Kuyucu.\n";
         cout << "\033[1;34m-----------------------------------------------------------------------" << endl;
-        cout << "\033[1;33mLütfen 'Yedekle', 'İndir' seçeneğini giriniz:" << endl;
+        cout << "\033[1;33mLütfen 'Yedekle', 'İndir' veya 'hatalı-dosyayı-yükle' seçeneğini giriniz:" << endl;
         cout << "1. Yedekle" << endl;
         cout << "2. İndir" << endl;
+        cout << "3. hatalı-dosyayı-yükle" << endl;
         cin >> secim;
         cin.ignore();
 
@@ -747,6 +748,19 @@ int main() {
                 dosyalari_birlestir(dosya_yolu);
             }
             cout << "\033[1;31mDosya indirildi!" << endl;
+        }
+        else if (secim == "3") {
+            string hataliwebhook;
+            string dosya_yolu;
+            cout << "Lütfen hatalı dosyayı yüklemek için webhook linki giriniz:" << endl;
+            getline(cin, hataliwebhook);
+            cout << "Lütfen hatalı dosyayı seçin." << endl;
+            vector<string> dosyalar = dosya_listesi(".");
+            get_cloud_files(bot, guild_id, category_id, bulut_dosyalar);
+            cout << "\033[1;33mLütfen 1 saniye bekleyin.\033[0m" << endl;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            dosya_sec(bot, dosyalar, bulut_dosyalar, dosya_yolu);
+            dosya_gonder(hataliwebhook, dosya_yolu, 1, dosya_yolu + " ", 0, "gonderimlog.txt");
         }
     }
     bot_thread.join();
