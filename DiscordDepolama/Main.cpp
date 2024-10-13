@@ -33,7 +33,7 @@ std::vector<std::string> dosya_listesi(const std::string& yol) {
     std::vector<std::string> dosyalar;
     // Dışlanacak dosyaların seti
     std::set<std::string> dislanacak_dosyalar = {
-        "discord.json",
+        ".env",
         "DiscordDepolama.exe",
         "dpp.dll",
         "libcrypto-1_1-x64.dll",
@@ -75,7 +75,6 @@ json parseEnvFile() {
     }
     else {
         // .env dosyası bulunamazsa, varsayılan değerleri ayarla
-        envData["webhook_log"] = "your log webhook url";
         envData["BOT_TOKEN"] = "your token";
         envData["guild_id"] = "your storage server";
         envData["mbsinir"] = 23;
@@ -84,7 +83,6 @@ json parseEnvFile() {
         // Dosyayı oluştur ve kaydet
         std::ofstream outfile(".env");
         if (outfile.is_open()) {
-            outfile << "webhook_log=" << envData["webhook_log"] << "\n";
             outfile << "BOT_TOKEN=" << envData["BOT_TOKEN"] << "\n";
             outfile << "guild_id=" << envData["guild_id"] << "\n";
             outfile << "mbsinir=" << envData["mbsinir"] << "\n";
@@ -610,8 +608,6 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
     dosya.close();
     dosya_gonder(olusturulanwebhook, linkler_txt, parca_no, dosya_yolu + "'nin indirme linkleri", 0, linkler_txt);
     dpp::webhook wh(olusturulanwebhook);
-    dpp::webhook whlog(webhook_log);
-    bot.execute_webhook_sync(whlog, dpp::message(dosya_yolu + "'nin indirme linkleri: [Tikla](" + url + ")\nProgram linki: [Tikla](https://github.com/keremlolgg/DiscordStorage/releases/latest)"));
     bot.execute_webhook_sync(wh, dpp::message(dosya_yolu + "'nin indirme linkleri: [Tikla](" + url + ")\nProgram linki: [Tikla](https://github.com/keremlolgg/DiscordStorage/releases/latest)"));
 }
 void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
@@ -719,7 +715,7 @@ int main() {
     std::vector<dpp::snowflake> bulut_dosyalar;
     json envData = parseEnvFile();
     dpp::cluster bot(envData["BOT_TOKEN"], dpp::i_default_intents | dpp::i_message_content);
-    webhook_log = envData["webhook_log"]; guild_id = envData["guild_id"]; string mbsinir_str = envData["mbsinir"]; mbsinir = stoi(mbsinir_str); category_id = envData["category_id"];
+    guild_id = envData["guild_id"]; string mbsinir_str = envData["mbsinir"]; mbsinir = stoi(mbsinir_str); category_id = envData["category_id"];
     bot.on_ready([&bot](const dpp::ready_t& event) {
         bot.set_presence(dpp::presence(dpp::ps_online, dpp::at_game, "Dosya yukleyici aktif"));
         });

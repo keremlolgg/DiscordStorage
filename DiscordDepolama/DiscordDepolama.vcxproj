@@ -24,9 +24,6 @@
   <ItemGroup>
     <Text Include="yedek.txt" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="discord.json" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
