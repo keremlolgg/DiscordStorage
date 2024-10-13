@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <IncludePath>$(SolutionDir)\kutuphaneler\include\;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\kutuphaneler\lib;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)\bin\</OutDir>
+    <IntDir>$(SolutionDir)\obj\$(ProjectName)\</IntDir>
+    <PublicIncludeDirectories>C:\Users\Public\Documents\cografyaoyun\dosyalar;$(PublicIncludeDirectories)</PublicIncludeDirectories>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AssemblerListingLocation>$(SolutionDir)\obj\lib$(ProjectName)</AssemblerListingLocation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ModuleOutputFile>$(SolutionDir)\obj\lib$(ProjectName)</ModuleOutputFile>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ModuleDependenciesFile>$(SolutionDir)\obj\lib$(ProjectName)</ModuleDependenciesFile>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ObjectFileName>$(SolutionDir)\obj\lib$(ProjectName)</ObjectFileName>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ProgramDataBaseFileName>$(SolutionDir)\obj\lib$(ProjectName)vc$(PlatformToolsetVersion).pdb</ProgramDataBaseFileName>
+      <AdditionalIncludeDirectories>$(SolutionDir)\include\</AdditionalIncludeDirectories>
+      <AdditionalUsingDirectories>
+      </AdditionalUsingDirectories>
+      <PreprocessorDefinitions>
+      </PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <StructMemberAlignment>Default</StructMemberAlignment>
+      <StringPooling>
+      </StringPooling>
+      <Optimization>MinSpace</Optimization>
+      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
+      <DisableLanguageExtensions>true</DisableLanguageExtensions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>sfml-main.lib;
+opengl32.lib;
+freetype.lib
+;winmm.lib
+;gdi32.lib;
+flac.lib
+;vorbisenc.lib;
+vorbisfile.lib;
+vorbis.lib;
+ogg.lib;sfml-graphics.lib;
+sfml-window.lib
+;sfml-system.lib;
+sfml-audio.lib;
+sfml-network.lib;libbrotlicommon.a;libbrotlidec.a;libcrypto.a;libcurl.a;libcurl.dll.a;libnghttp2.a;libnghttp3.a;libngtcp2.a;libngtcp2_crypto_quictls.a;libpsl.a;libssh2.a;libssl.a;libz.a;libzstd.a;dpp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AddModuleNamesToAssembly>%(AddModuleNamesToAssembly)</AddModuleNamesToAssembly>
+      <GenerateWindowsMetadata>
+      </GenerateWindowsMetadata>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+      <PreventDllBinding>
+      </PreventDllBinding>
+      <DelayLoadDLLs>
+      </DelayLoadDLLs>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <ImportLibrary>
+      </ImportLibrary>
+      <LinkStatus>
+      </LinkStatus>
+      <Version>
+      </Version>
+    </Link>
+    <CopyFileToFolders>
+      <DestinationFolders>
+      </DestinationFolders>
+      <DestinationFileName>
+      </DestinationFileName>
+      <RootFolder>
+      </RootFolder>
+    </CopyFileToFolders>
+    <ProjectReference>
+      <UseLibraryDependencyInputs>
+      </UseLibraryDependencyInputs>
+      <LinkLibraryDependencies />
+    </ProjectReference>
+    <CustomBuild>
+      <RootFolder>
+      </RootFolder>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+</Project>
