@@ -2,6 +2,10 @@
 
 DiscordDepolama, Discord'da bot tokeni sayesinde dosya depolamanızı sağlayan bir projedir. Bu proje, dosyalarınızı güvenli bir şekilde depolamak ve yönetmek için gereken tüm araçları içerir.
 
+## Uyarı
+
+Dosyayı yükledikten sonra odaya herhangi bir mesaj atmayın botun bulut depolaması bozuluyor.
+
 ## Özellikler
 
 - Discord bot tokeni kullanarak güvenli dosya depolama.
