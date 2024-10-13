@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <memory>
 #include <array>
+#include <set>
 #include <chrono>
 #include <locale>
 #include <regex>
@@ -28,11 +29,28 @@ using json = nlohmann::json;
 struct Response {
     std::string data;
 };
-vector<string> dosya_listesi(const std::string& yol) {
-    vector<string> dosyalar;
+std::vector<std::string> dosya_listesi(const std::string& yol) {
+    std::vector<std::string> dosyalar;
+    // Dışlanacak dosyaların seti
+    std::set<std::string> dislanacak_dosyalar = {
+        "discord.json",
+        "DiscordDepolama.exe",
+        "dpp.dll",
+        "libcrypto-1_1-x64.dll",
+        "libcurl-x64.dll",
+        "libsodium.dll",
+        "libssl-1_1-x64.dll",
+        "opus.dll",
+        "zlib1.dll"
+    };
+
     for (const auto& entry : std::filesystem::directory_iterator(yol)) {
         if (entry.is_regular_file()) {
-            dosyalar.push_back(entry.path().filename().string());
+            std::string dosya_adi = entry.path().filename().string();
+            // Eğer dosya adını dışlanacak dosyalar setinde bulamazsak ekle
+            if (dislanacak_dosyalar.find(dosya_adi) == dislanacak_dosyalar.end()) {
+                dosyalar.push_back(dosya_adi);
+            }
         }
     }
     return dosyalar;
