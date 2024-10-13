@@ -1,18 +1,15 @@
 # DiscordDepolama
-Discord'da webhook sayesinde dosya depolamanızı sağlar.
+Discord'da bot tokeni sayesinde dosya depolamanızı sağlar.
 
-discord.txt isimli dosya oluşturun,
-ilk satır webhook linki ikinci satır
-max dosya boyutu tavsiye edilen boyut 23.
+discord.json isimli json dosyası oluşturun,
 
-Gerekli kütüphane: c++ Curl
+Örnek:
+{
+    "BOT_TOKEN": "your token",
+    "category_id": "0",
+    "guild_id": "your storage server",
+    "mbsinir": 23,
+    "webhook_log": "your log webhook url"
+}
 
------------------------------------------------------------
-
-Discord allows you to store files with webhook.
-
-Create a file named discord.txt,
-first line webhook link second line
-max file size recommended size 23.
-
-Required library: c++ Curl
+Gerekli kütüphane: c++, LibCurl, Dpp
