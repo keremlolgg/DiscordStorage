@@ -563,7 +563,7 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
                     mevcut_parca_sayisi = parca_sayisi;
                 }
             }
-            cout << "\033[1;31mAynı dosya tespit edildi kaldığı yerden devam ediyor.\n Fazladan oluşturulan kanalı silebilirsiniz." << endl;
+            cout << "\033[1;31mAynı dosya tespit edildi kaldığı yerden devam ediyor.\n" << endl;
         }
         else {
             cout << "\033[1;31mAynı isimde farklı bir dosya tespit edildi lütfen diğer dosyayı silin veya taşıyın." << endl;
@@ -574,6 +574,8 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
         kontrol.close();
     }
     else {
+        handle_channel_creation(bot, dosya_yolu, guild_id, category_id); // webhook oluşturuluyor
+        std::this_thread::sleep_for(std::chrono::seconds(1));
         std::ofstream dosya2(linkler_txt, std::ios::app);
         dosya2 << toplam_parca << std::endl;
         dosya2 << dosya_yolu << std::endl;
@@ -753,8 +755,6 @@ int main() {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             dosya_sec(bot, dosyalar, bulut_dosyalar, dosya_yolu);
             if (!dosya_yolu.empty()) {
-                handle_channel_creation(bot, dosya_yolu, guild_id, category_id); // webhook oluşturuluyor
-                std::this_thread::sleep_for(std::chrono::seconds(1));
                 dosyayi_parcalara_bol_ve_gonder(dosya_yolu, bot);
                 cout << "\033[1;33mLütfen " + dosya_yolu + "_linkleri.txt dosyasını saklayın. O linkler sayesinde dosyanızı tekrar indirebilirsiniz.\033[0m" << endl;
                 cout << "\033[1;33mEğer silinmeyen parça varsa o yüklenmemiş olabilir lütfen o parçayı kontrol edin ve parçayı elle yükleyerek olması gereken yere ekleyin.\033[0m" << endl;

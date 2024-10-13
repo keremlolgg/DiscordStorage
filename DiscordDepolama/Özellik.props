@@ -50,11 +50,9 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>sfml-main.lib;
-opengl32.lib;
-freetype.lib
+opengl32.lib;freetype.lib
 ;winmm.lib
-;gdi32.lib;
-flac.lib
+;gdi32.lib;flac.lib
 ;vorbisenc.lib;
 vorbisfile.lib;
 vorbis.lib;
