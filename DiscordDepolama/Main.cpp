@@ -21,7 +21,6 @@ json j;
 string url;
 string odaismi;
 string olusturulanwebhook;
-string webhook_log;
 string odaid;
 string guild_id;
 string category_id;
@@ -554,6 +553,7 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
         getline(kontrol, son_satir);
         getline(kontrol, son_satir);
         getline(kontrol, hash);
+        getline(kontrol, olusturulanwebhook);
         if (trimWhitespaceAndSpecialChars(hash) == trimWhitespaceAndSpecialChars(getFileHash(dosya_yolu))) {
             while (std::getline(kontrol, son_satir)) {
                 std::istringstream iss(son_satir);
@@ -563,7 +563,7 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
                     mevcut_parca_sayisi = parca_sayisi;
                 }
             }
-            cout << "\033[1;31mAynı dosya tespit edildi kaldığı yerden devam ediyor." << endl;
+            cout << "\033[1;31mAynı dosya tespit edildi kaldığı yerden devam ediyor.\n Fazladan oluşturulan kanalı silebilirsiniz." << endl;
         }
         else {
             cout << "\033[1;31mAynı isimde farklı bir dosya tespit edildi lütfen diğer dosyayı silin veya taşıyın." << endl;
@@ -578,6 +578,7 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
         dosya2 << toplam_parca << std::endl;
         dosya2 << dosya_yolu << std::endl;
         dosya2 << getFileHash(dosya_yolu) << endl;
+        dosya2 << olusturulanwebhook << endl;
         dosya2.close();
     }
 
@@ -621,6 +622,7 @@ void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
     string hash;
     std::string satir;
     std::string hedef_dosya_adi;
+    string webhook;
     std::vector<std::pair<int, std::string>> linkler;
 
     if (std::getline(linkler_dosyasi, satir)) {
@@ -638,7 +640,11 @@ void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
         return;
     }
     if (!std::getline(linkler_dosyasi, hash)) {
-        std::cerr << "Hash okunamadı okunamadı!" << std::endl;
+        std::cerr << "Hash okunamadı!" << std::endl;
+        return;
+    }
+    if (!std::getline(linkler_dosyasi, webhook)) {
+        std::cerr << "Webhook okunamadı!" << std::endl;
         return;
     }
     while (std::getline(linkler_dosyasi, satir)) {

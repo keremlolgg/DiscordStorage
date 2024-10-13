@@ -2312,10 +2312,10 @@ C:\Users\KeremK\. Projeler\Vs 2022\DiscordDepolama\kutuphaneler\include\dpp\bign
       C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\memory(1560,7):
       'std::shared_ptr<dpp::openssl_bignum>' bildirimine bakın
   
-C:\Users\KeremK\. Projeler\Vs 2022\DiscordDepolama\DiscordDepolama\Main.cpp(193,61): warning C4267: 'bağımsız değişken': 'size_t' - 'DWORD' dönüşümü; veri kaybı olabilir
+C:\Users\KeremK\. Projeler\Vs 2022\DiscordDepolama\DiscordDepolama\Main.cpp(192,61): warning C4267: 'bağımsız değişken': 'size_t' - 'DWORD' dönüşümü; veri kaybı olabilir
   Kod üretiliyor
-  60 of 3761 functions ( 1.6%) were compiled, the rest were copied from previous compilation.
+  1 of 3759 functions (<0.1%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    226 functions had inline decision re-evaluated but remain unchanged
+    8 functions had inline decision re-evaluated but remain unchanged
   Kodun üretilmesi tamamlandı
   DiscordDepolama.vcxproj -> C:\Users\KeremK\. Projeler\Vs 2022\DiscordDepolama\bin\DiscordDepolama.exe
