@@ -2,6 +2,7 @@
 Discord'da bot tokeni sayesinde dosya depolamanızı sağlar.
 
 discord.json isimli json dosyası oluşturun,
+
 Örnek:
 {
     "BOT_TOKEN": "your token",
@@ -10,4 +11,5 @@ discord.json isimli json dosyası oluşturun,
     "mbsinir": 23,
     "webhook_log": "your log webhook url"
 }
+
 Gerekli kütüphane: c++, LibCurl, Dpp
