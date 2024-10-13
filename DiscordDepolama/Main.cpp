@@ -55,10 +55,47 @@ std::vector<std::string> dosya_listesi(const std::string& yol) {
     }
     return dosyalar;
 }
-void update_json_and_save() {
-    std::ofstream outFile("discord.json");
-    outFile << j.dump(4);
-    outFile.close();
+json parseEnvFile() {
+    json envData;
+    std::ifstream file(".env");
+    std::string line;
+
+    if (file.is_open()) {
+        while (std::getline(file, line)) {
+            size_t delimiterPos = line.find('=');
+            if (delimiterPos != std::string::npos) {
+                std::string key = line.substr(0, delimiterPos);
+                std::string value = line.substr(delimiterPos + 1);
+
+                // Key ve value'leri json yapısına ekle
+                envData[key] = value;
+            }
+        }
+        file.close();
+    }
+    else {
+        // .env dosyası bulunamazsa, varsayılan değerleri ayarla
+        envData["webhook_log"] = "your log webhook url";
+        envData["BOT_TOKEN"] = "your token";
+        envData["guild_id"] = "your storage server";
+        envData["mbsinir"] = 23;
+        envData["category_id"] = "category_id";
+
+        // Dosyayı oluştur ve kaydet
+        std::ofstream outfile(".env");
+        if (outfile.is_open()) {
+            outfile << "webhook_log=" << envData["webhook_log"] << "\n";
+            outfile << "BOT_TOKEN=" << envData["BOT_TOKEN"] << "\n";
+            outfile << "guild_id=" << envData["guild_id"] << "\n";
+            outfile << "mbsinir=" << envData["mbsinir"] << "\n";
+            outfile << "category_id=" << envData["category_id"] << "\n";
+            outfile.close();
+        }
+
+        std::cout << ".env dosyası bulunmadı, oluşturuldu: .env" << std::endl;
+    }
+
+    return envData;
 }
 std::string trimWhitespaceAndSpecialChars(const std::string& str) {
     std::string result = str;
@@ -680,22 +717,9 @@ int main() {
     setlocale(LC_ALL, "Turkish");
     string secim = "";
     std::vector<dpp::snowflake> bulut_dosyalar;
-    std::ifstream file("discord.json");
-    if (file.is_open()) {
-        file >> j;
-        file.close();
-    }
-    else {
-        j["webhook_log"] = "your log webhook url";
-        j["BOT_TOKEN"] = "your token";
-        j["guild_id"] = "your storage server";
-        j["mbsinir"] = 23;
-        j["category_id"] = "category_id";
-        update_json_and_save();
-        cout << "JSON dosyası bulunmadı, oluşturuldu: " << "discord.json" << std::endl;
-    }
-    dpp::cluster bot(j["BOT_TOKEN"], dpp::i_default_intents | dpp::i_message_content);
-    webhook_log = j["webhook_log"]; guild_id = j["guild_id"]; mbsinir = j["mbsinir"]; category_id = j["category_id"];
+    json envData = parseEnvFile();
+    dpp::cluster bot(envData["BOT_TOKEN"], dpp::i_default_intents | dpp::i_message_content);
+    webhook_log = envData["webhook_log"]; guild_id = envData["guild_id"]; string mbsinir_str = envData["mbsinir"]; mbsinir = stoi(mbsinir_str); category_id = envData["category_id"];
     bot.on_ready([&bot](const dpp::ready_t& event) {
         bot.set_presence(dpp::presence(dpp::ps_online, dpp::at_game, "Dosya yukleyici aktif"));
         });

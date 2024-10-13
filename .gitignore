@@ -3,3 +3,6 @@
 * .db
 * .ipch
 /.vs/
+* .env
+.env
+
