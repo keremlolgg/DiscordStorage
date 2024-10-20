@@ -61,7 +61,7 @@ DiscordDepolama botu ile dosya yüklemek ve depolamak için botunuzu çalıştı
 
 ## Katkıda Bulunanlar
 
-- [KeremLolg](https://github.com/keremlolgg) - Proje sahibi ve geliştirici
+- [Kerem_KK](https://github.com/keremlolgg) - Proje sahibi ve geliştirici
 
 ## Lisans
 
