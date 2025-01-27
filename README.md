@@ -5,6 +5,7 @@ DiscordDepolama, Discord'da bot tokeni sayesinde dosya depolamanızı sağlayan 
 ## Bilinen Sorun
 
 Dosyayı yükledikten sonra linki alınıyor fakat link belli bir süre sonra geçersiz oluyor. Bot tokeni ile mesajları anlık çekmek gerekiyor ama üşeniyorum
+Discord webhook dosya yükleme sınırı 25 den düşürülmüş kaç oldu bilmiyorum ama üşendim hesaplamaya
 
 ## Uyarı
 
