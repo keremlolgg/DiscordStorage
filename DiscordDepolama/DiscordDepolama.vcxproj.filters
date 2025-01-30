@@ -24,4 +24,9 @@
       <Filter>Kaynak Dosyaları</Filter>
     </Text>
   </ItemGroup>
+  <ItemGroup>
+    <None Include=".env">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+  </ItemGroup>
 </Project>

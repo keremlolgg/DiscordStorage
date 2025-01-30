@@ -32,7 +32,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <ProgramDataBaseFileName>$(SolutionDir)\obj\lib$(ProjectName)vc$(PlatformToolsetVersion).pdb</ProgramDataBaseFileName>
-      <AdditionalIncludeDirectories>$(SolutionDir)\include\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\kutuphaneler\include\</AdditionalIncludeDirectories>
       <AdditionalUsingDirectories>
       </AdditionalUsingDirectories>
       <PreprocessorDefinitions>

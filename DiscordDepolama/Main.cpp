@@ -11,6 +11,7 @@
 #include <chrono>
 #include <locale>
 #include <regex>
+#include <algorithm>
 #include <CURL/curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <dpp/dpp.h>
@@ -18,42 +19,15 @@ using namespace std;
 using namespace dpp;
 int mbsinir = 23;
 json j;
-string url;
+
 string odaismi;
+string oda_id;
+string mesaj_id;
 string olusturulanwebhook;
 string odaid;
 string guild_id;
 string category_id;
 using json = nlohmann::json;
-struct Response {
-    std::string data;
-};
-std::vector<std::string> dosya_listesi(const std::string& yol) {
-    std::vector<std::string> dosyalar;
-    // Dışlanacak dosyaların seti
-    std::set<std::string> dislanacak_dosyalar = {
-        ".env",
-        "DiscordDepolama.exe",
-        "dpp.dll",
-        "libcrypto-1_1-x64.dll",
-        "libcurl-x64.dll",
-        "libsodium.dll",
-        "libssl-1_1-x64.dll",
-        "opus.dll",
-        "zlib1.dll"
-    };
-
-    for (const auto& entry : std::filesystem::directory_iterator(yol)) {
-        if (entry.is_regular_file()) {
-            std::string dosya_adi = entry.path().filename().string();
-            // Eğer dosya adını dışlanacak dosyalar setinde bulamazsak ekle
-            if (dislanacak_dosyalar.find(dosya_adi) == dislanacak_dosyalar.end()) {
-                dosyalar.push_back(dosya_adi);
-            }
-        }
-    }
-    return dosyalar;
-}
 json parseEnvFile() {
     json envData;
     std::ifstream file(".env");
@@ -74,10 +48,10 @@ json parseEnvFile() {
     }
     else {
         // .env dosyası bulunamazsa, varsayılan değerleri ayarla
-        envData["BOT_TOKEN"] = "your token";
-        envData["guild_id"] = "your storage server";
-        envData["mbsinir"] = 23;
-        envData["category_id"] = "category_id";
+        envData["BOT_TOKEN"] = 0;
+        envData["guild_id"] = 0;
+        envData["mbsinir"] = 8;
+        envData["category_id"] = 0;
 
         // Dosyayı oluştur ve kaydet
         std::ofstream outfile(".env");
@@ -94,6 +68,26 @@ json parseEnvFile() {
 
     return envData;
 }
+struct Response {
+    std::string data;
+};
+struct Link {
+    int parca_numarasi;
+    std::string oda_id;
+    std::string mesaj_id;
+};
+size_t write_data(void* buf, size_t size, size_t nmemb, FILE* userp) {
+    size_t written = fwrite(buf, size, nmemb, userp);
+    return written;
+} 
+// curl şeysi
+size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t total_size = size * nmemb;
+    Response* response = static_cast<Response*>(userp);
+    response->data.append(static_cast<char*>(contents), total_size);
+    return total_size;
+}
+// curl şeysi
 std::string trimWhitespaceAndSpecialChars(const std::string& str) {
     std::string result = str;
 
@@ -107,58 +101,7 @@ std::string trimWhitespaceAndSpecialChars(const std::string& str) {
 
     return result;
 }
-std::string url_bul(const std::string& json_str) {
-    std::string url;
-    std::string key = "\"url\":\"";
-    std::size_t start = json_str.find(key);
-
-    if (start != std::string::npos) {
-        start += key.length();
-        std::size_t end = json_str.find("\"", start);
-        if (end != std::string::npos) {
-            url = json_str.substr(start, end - start);
-        }
-    }
-
-    return url;
-}
-std::string get_second_line(const std::string& dosya_adi) {
-    std::ifstream file(dosya_adi);
-    std::string line;
-    int line_number = 0;
-
-    // İkinci satırı okuma
-    while (std::getline(file, line)) {
-        line_number++;
-        if (line_number == 2) {
-            return line; // İkinci satırı döndür
-        }
-    }
-
-    return ""; // İkinci satır yoksa boş döndür
-}
-std::string extract_discord_link(const std::string& input) {
-    std::regex url_regex(R"(https?://cdn\.discordapp\.com[^\s]*)"); // "cdn.discord" ile başlayan URL'yi bulmak için regex
-    std::smatch url_match;
-
-    if (std::regex_search(input, url_match, url_regex)) {
-        return url_match.str(0); // Bulunan ilk URL'yi döndür
-    }
-    else {
-        return ""; // Eğer URL bulunamazsa boş string döndür
-    }
-}
-std::string extract_before_download_links(const std::string& input) {
-    std::string delimiter = ": [Tikla]"; // Hedef kelime
-    size_t pos = input.find(delimiter); // Hedef kelimenin pozisyonu
-
-    if (pos != std::string::npos) { // Eğer hedef kelime bulunduysa
-        return input.substr(0, pos); // Başlangıçtan hedef kelimenin bulunduğu yere kadar olan kısmı döndür
-    }
-    else {
-        return ""; // Eğer hedef kelime bulunamazsa boş string döndür
-    }
-}
+// txt ye yazılamayan hashdeki karakterleri silmek için
 std::string getFileHash(const std::string& filename) {
     std::string command = "CertUtil -hashfile \"" + filename + "\" SHA256";
     STARTUPINFOA startupInfo;
@@ -234,117 +177,69 @@ std::string getFileHash(const std::string& filename) {
     // İkinci satırı döndür
     return secondLine;
 }
-size_t write_data(void* buf, size_t size, size_t nmemb, FILE* userp) {
-    size_t written = fwrite(buf, size, nmemb, userp);
-    return written;
-}
-size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t total_size = size * nmemb;
-    Response* response = static_cast<Response*>(userp);
-    response->data.append(static_cast<char*>(contents), total_size);
-    return total_size;
-}
-int dosya_indir(const std::string& url, const std::string& dosya_adi) {
-    CURL* curl;
-    FILE* fp;
-    CURLcode res;
+// hash hesaplama
+std::pair<std::string, std::string> id_bul(const std::string& json_str) {
+    std::string oda_id;  // channel_id
+    std::string mesaj_id;  // id
+    std::string embed_key = "\"embeds\"";
 
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init();
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    // JSON verisini parse et
+    auto json_response = nlohmann::json::parse(json_str);
 
-        if (fopen_s(&fp, dosya_adi.c_str(), "wb") != 0) {
-            std::cerr << "Dosya açılamadı: " << dosya_adi << std::endl;
-            return 1;
-        }
-
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-        }
-
-        fclose(fp);
-        curl_easy_cleanup(curl);
+    // Channel ID'yi (Oda ID) bulma
+    if (json_response.contains("channel_id")) {
+        oda_id = json_response["channel_id"].get<std::string>();
     }
 
-    curl_global_cleanup();
-    return 0;
-}
-void createWebhook(dpp::cluster& bot, const std::string& channel_id, const std::string& name) {
-    dpp::webhook wh;
-    wh.name = name;  // Webhook adını belirle
-    wh.channel_id = channel_id;  // Hedef kanalın ID'sini belirt
-
-    string webhook_url; // URL için optional değişken
-
-    bot.create_webhook(wh, [&webhook_url](const dpp::confirmation_callback_t& callback) {
-        if (callback.is_error()) {
-            std::cerr << "Webhook oluşturulamadı: " << callback.get_error().message << std::endl;
-        }
-        else {
-            const dpp::webhook& created_webhook = std::get<dpp::webhook>(callback.value);
-            std::cout << "Webhook oluşturuldu: " << created_webhook.name << " (ID: " << created_webhook.id << ")" << std::endl;
-            std::cout << "Webhook URL: " << created_webhook.url << std::endl;
-            olusturulanwebhook = created_webhook.url; // URL'yi optional değişkene ata
-        }
-        });
-}
-void create_category(dpp::cluster& bot, const std::string& category_name, const std::string& guild_id, std::function<void(const std::string&)> on_category_created) {
-    // Kategori oluşturma
-    dpp::channel category = dpp::channel()
-        .set_name(category_name)
-        .set_guild_id(guild_id)
-        .set_type(dpp::channel_type::CHANNEL_CATEGORY); // Kategori olarak ayarla
-
-    bot.channel_create(category, [&bot, on_category_created](const dpp::confirmation_callback_t& callback) {
-        if (callback.is_error()) {
-            bot.log(dpp::loglevel::ll_error, callback.get_error().message);
-            return;
-        }
-
-        auto created_category = callback.get<dpp::channel>();
-        std::string category_id = std::to_string(created_category.id);
-        std::cout << "Kategori oluşturuldu: " << created_category.name << " (ID: " << category_id << ")" << std::endl;
-        on_category_created(category_id);  // Kategori ID'sini geri döndür
-        });
-}
-void create_channel(dpp::cluster& bot, const std::string& channel_name, const std::string& guild_id, const std::string& category_id) {
-    dpp::channel channel = dpp::channel()
-        .set_name(channel_name)
-        .set_guild_id(guild_id);
-
-    if (category_id != "category_id") {
-        channel.set_parent_id(category_id); // Kategori ID'si varsa kanalı ona bağla
+    // ID'yi (Mesaj ID) bulma
+    if (json_response.contains("id")) {
+        mesaj_id = json_response["id"].get<std::string>();
     }
 
-    bot.channel_create(channel, [&bot, category_id](const dpp::confirmation_callback_t& callback) {
-        if (callback.is_error()) {
-            bot.log(dpp::loglevel::ll_error, callback.get_error().message);
-            return;
+    // Eğer embeds varsa, oradan da id ve channel_id'yi alalım
+    if (json_response.contains("embeds") && !json_response["embeds"].empty()) {
+        for (const auto& embed : json_response["embeds"]) {
+            if (embed.contains("id") && embed.contains("channel_id")) {
+                // Embeddeki channel_id ve id'yi alıp ayrı tutuyoruz
+                oda_id = embed["channel_id"].get<std::string>();
+                mesaj_id = embed["id"].get<std::string>();
+            }
         }
+    }
 
-        auto created_channel = callback.get<dpp::channel>();
-        std::string odaismi = created_channel.name;
-        std::string odaid = std::to_string(created_channel.id);
-        std::cout << "Odanın adı: " << odaismi << ", ID: " << odaid << std::endl;
-        createWebhook(bot, odaid, "Dosya Yukleyici"); // Webhook oluştur
-        });
+    // Oda ve Mesaj ID'lerini döndürüyoruz
+    return { oda_id, mesaj_id };
 }
-void handle_channel_creation(dpp::cluster& bot, const std::string& channel_name, const std::string& guild_id, const std::string& category_id) {
-    if (category_id == "0") {
-        create_category(bot, "Yuklemeler", guild_id, [&bot, channel_name, guild_id](const std::string& new_category_id) {
-            create_channel(bot, channel_name, guild_id, new_category_id);
-            });
+// dosyadan oda ve mesaj id yi ayıkla
+
+std::string get_second_line(const std::string& dosya_adi) {
+    std::ifstream file(dosya_adi);
+    std::string line;
+    int line_number = 0;
+
+    // İkinci satırı okuma
+    while (std::getline(file, line)) {
+        line_number++;
+        if (line_number == 2) {
+            return line; // İkinci satırı döndür
+        }
+    }
+
+    return ""; // İkinci satır yoksa boş döndür
+}
+//buluttaki dosyanın ismini alma
+std::pair<std::string, std::string> extract_discord_id(const std::string& input) {
+    std::regex number_regex(R"(\((\d+),(\d+)\))"); // (oda_id,mesaj_id) formatındaki sayıları yakalayan regex
+    std::smatch number_match;
+
+    if (std::regex_search(input, number_match, number_regex)) {
+        return { number_match.str(1), number_match.str(2) }; // Oda ID ve Mesaj ID döndür
     }
     else {
-        create_channel(bot, channel_name, guild_id, category_id);
+        return { "", "" }; // Eşleşme olmazsa boş stringler döndür
     }
 }
+// buluttaki dosyanın indirme idleri alma
 string get_messages(dpp::cluster& bot, dpp::snowflake channel_id, int64_t limit) {
     std::promise<std::string> promise; // Promise nesnesi oluştur
     std::future<std::string> future = promise.get_future(); // Future oluştur
@@ -368,26 +263,190 @@ string get_messages(dpp::cluster& bot, dpp::snowflake channel_id, int64_t limit)
 
     return future.get(); // Mesajlar alındıktan sonra sonucu döndür
 }
-void list_channels(dpp::cluster& bot, const std::string& guild_id, const std::string& category_id) {
-    bot.channels_get(guild_id, [&bot, category_id](const dpp::confirmation_callback_t& callback) {
-        if (callback.is_error()) {
-            std::cerr << "Kanallar alınırken hata oluştu: " << callback.get_error().message << std::endl;
-            return;
+// odadaki son mesajı alır
+std::string get_file_url(const std::string& channel_id, const std::string& message_id) {
+    // Örnek: parseEnvFile fonksiyonunu kullanarak BOT_TOKEN'ı çekiyoruz (kendi fonksiyonunuz)
+    json envData = parseEnvFile();  // Burada çevresel verileri okuyoruz (BOT_TOKEN gibi)
+    std::string bot_token = envData["BOT_TOKEN"]; // Token'ı alıyoruz
+    CURL* curl;
+    CURLcode res;
+    std::string read_buffer;
+
+    // Discord API URL'si
+    std::string url = "https://discord.com/api/v10/channels/" + channel_id + "/messages/" + message_id;
+
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    curl = curl_easy_init();
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); // SSL doğrulamasını devre dışı bırak
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L); // Host doğrulamasını devre dışı bırak
+
+    if (curl) {
+        // Header'lar
+        struct curl_slist* headers = nullptr;
+        headers = curl_slist_append(headers, ("Authorization: Bot " + bot_token).c_str());  // Burada .c_str() kullanıyoruz
+
+        // URL ve header'lar ayarlandı
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());  // .c_str() kullanarak doğru türde parametre sağlıyoruz
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+        // Yanıtın okunacağı buffer
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
+
+        // İstek gönderiliyor
+        res = curl_easy_perform(curl);
+
+        if (res != CURLE_OK) {
+            std::cerr << "Curl hata: " << curl_easy_strerror(res) << std::endl;
+            curl_easy_cleanup(curl);
+            return "";
         }
 
-        // Kanalları alınca callback.value içerisinden çekiyoruz
-        auto channel_map = std::get<dpp::channel_map>(callback.value);
+        // JSON parsing işlemi
+        try {
+            // nlohmann/json kütüphanesi ile yanıtı parse ediyoruz
+            auto json_response = nlohmann::json::parse(read_buffer);
 
-        // Belirtilen kategori ID'sindeki kanalları listeleyelim
-        std::cout << "Kategori ID'sindeki kanallar:" << std::endl;
-        for (const auto& [id, channel] : channel_map) {
-            // Kategori ID'sini kontrol et (snowflake formatında)
-            if (std::to_string(channel.parent_id) == category_id) {
-                std::cout << "Kanal İsmi: " << channel.name << ", Kanal ID'si: " << id << std::endl;
+            // Dosyanın URL'sini almak için json yanıtını kontrol ediyoruz
+            if (!json_response.empty() && json_response.contains("attachments") && !json_response["attachments"].empty()) {
+                // İlk dosyanın URL'si
+                std::string file_url = json_response["attachments"][0]["url"];
+                curl_easy_cleanup(curl);
+                return file_url;
             }
+            else {
+                cerr << "Dönüt: " << read_buffer << endl;
+                std::cerr << "Mesajda dosya bulunamadı!" << std::endl;
+                curl_easy_cleanup(curl);
+                return "";
+            }
+        }
+        catch (const nlohmann::json::exception& e) {
+            std::cerr << "JSON parsing hatası: " << e.what() << std::endl;
+            curl_easy_cleanup(curl);
+            return "";
+        }
+    }
+
+    curl_easy_cleanup(curl);
+    return "";
+}
+// oda id ve mesaj id den indirme linki alma
+std::string json_yaz(int parca_no, const std::string& oda_id, const std::string& mesaj_id) {
+    // JSON objesi oluştur
+    nlohmann::json json_obj;
+    json_obj["parca_no"] = parca_no;
+    json_obj["oda_id"] = oda_id;
+    json_obj["mesaj_id"] = mesaj_id;
+
+    // JSON'u string olarak döndür
+    std::string json_string = json_obj.dump();
+
+
+    return json_string;  // JSON stringini döndür
+}
+
+void createWebhook(dpp::cluster& bot, const std::string& channel_id, const std::string& name) {
+    dpp::webhook wh;
+    wh.name = name;  // Webhook adını belirle
+    wh.channel_id = channel_id;  // Hedef kanalın ID'sini belirt
+
+    string webhook_url; // URL için optional değişken
+
+    bot.create_webhook(wh, [&webhook_url](const dpp::confirmation_callback_t& callback) {
+        if (callback.is_error()) {
+            std::cerr << "Webhook oluşturulamadı: " << callback.get_error().message << std::endl;
+        }
+        else {
+            const dpp::webhook& created_webhook = std::get<dpp::webhook>(callback.value);
+            std::cout << "Webhook oluşturuldu: " << created_webhook.name << " (ID: " << created_webhook.id << ")" << std::endl;
+            std::cout << "Webhook URL: " << created_webhook.url << std::endl;
+            olusturulanwebhook = created_webhook.url; // URL'yi optional değişkene ata
         }
         });
 }
+//webhook oluşturma
+void create_category(dpp::cluster& bot, const std::string& category_name, const std::string& guild_id, std::function<void(const std::string&)> on_category_created) {
+    // Kategori oluşturma
+    dpp::channel category = dpp::channel()
+        .set_name(category_name)
+        .set_guild_id(guild_id)
+        .set_type(dpp::channel_type::CHANNEL_CATEGORY); // Kategori olarak ayarla
+
+    bot.channel_create(category, [&bot, on_category_created](const dpp::confirmation_callback_t& callback) {
+        if (callback.is_error()) {
+            bot.log(dpp::loglevel::ll_error, callback.get_error().message);
+            return;
+        }
+
+        auto created_category = callback.get<dpp::channel>();
+        std::string category_id = std::to_string(created_category.id);
+        std::cout << "Kategori oluşturuldu: " << created_category.name << " (ID: " << category_id << ")" << std::endl;
+        on_category_created(category_id);  // Kategori ID'sini geri döndür
+        });
+}
+// kategori oluşturma
+void create_channel(dpp::cluster& bot, const std::string& channel_name, const std::string& guild_id, const std::string& category_id) {
+    dpp::channel channel = dpp::channel()
+        .set_name(channel_name)
+        .set_guild_id(guild_id);
+
+    if (category_id != "category_id") {
+        channel.set_parent_id(category_id); // Kategori ID'si varsa kanalı ona bağla
+    }
+
+    bot.channel_create(channel, [&bot, category_id](const dpp::confirmation_callback_t& callback) {
+        if (callback.is_error()) {
+            bot.log(dpp::loglevel::ll_error, callback.get_error().message);
+            return;
+        }
+
+        auto created_channel = callback.get<dpp::channel>();
+        std::string odaismi = created_channel.name;
+        std::string odaid = std::to_string(created_channel.id);
+        std::cout << "Odanın adı: " << odaismi << ", ID: " << odaid << std::endl;
+        createWebhook(bot, odaid, "Dosya Yukleyici"); 
+    });
+}
+// kanal oluşturma
+
+std::vector<std::string> dosya_listesi(const std::string& yol) {
+    std::vector<std::string> dosyalar;
+    // Dışlanacak dosyaların seti
+    std::set<std::string> dislanacak_dosyalar = {
+        ".env",
+        "DiscordDepolama.exe",
+        "dpp.dll",
+        "libcrypto-1_1-x64.dll",
+        "libcurl-x64.dll",
+        "libsodium.dll",
+        "libssl-1_1-x64.dll",
+        "opus.dll",
+        "zlib1.dll",
+        //debug için rahatsız ediyor
+        "DiscordDepolama.aps",
+        "DiscordDepolama.vcxproj",
+        "DiscordDepolama.vcxproj.filters",
+        "DiscordDepolama.vcxproj.user",
+        "gonderimlog.txt",
+        "Main.cpp",
+        "Resource.rc",
+        "resource1.h",
+        "Özellik.props"
+    };
+
+    for (const auto& entry : std::filesystem::directory_iterator(yol)) {
+        if (entry.is_regular_file()) {
+            std::string dosya_adi = entry.path().filename().string();
+            // Eğer dosya adını dışlanacak dosyalar setinde bulamazsak ekle
+            if (dislanacak_dosyalar.find(dosya_adi) == dislanacak_dosyalar.end()) {
+                dosyalar.push_back(dosya_adi);
+            }
+        }
+    }
+    return dosyalar;
+}
+//yerel dosya listesi
 void get_cloud_files(dpp::cluster& bot, const std::string& guild_id, const std::string& category_id, std::vector<dpp::snowflake>& bulut_dosyalar) {
     bulut_dosyalar.clear();
     bot.channels_get(guild_id, [&bot, category_id, &bulut_dosyalar](const dpp::confirmation_callback_t& callback) {
@@ -404,68 +463,7 @@ void get_cloud_files(dpp::cluster& bot, const std::string& guild_id, const std::
         }
         });
 }
-
-void dosya_sec(dpp::cluster& bot, const std::vector<std::string>& yerel_dosyalar, const std::vector<dpp::snowflake>& bulut_dosyalar, std::string& dosya_yolu) {
-    while (true) {
-        std::cout << "\033[1;33mMevcut dosyalar:\033[0m" << std::endl;
-
-        // Yerel dosyalar
-        std::cout << "\033[1;34mYerel Dosyalar:\033[0m" << std::endl;
-        for (size_t i = 0; i < yerel_dosyalar.size(); ++i) {
-            std::cout << i + 1 << ". " << yerel_dosyalar[i] << std::endl;
-        }
-
-        // Buluttaki dosyalar
-        std::cout << "\033[1;34mBuluttaki Dosyalar:\033[0m" << std::endl;
-        for (size_t i = 0; i < bulut_dosyalar.size(); ++i) {
-            std::cout << i + 1 + yerel_dosyalar.size() << ". " << extract_before_download_links(get_messages(bot, bulut_dosyalar[i], 1)) << std::endl;
-            //cout << "Dosya Url: " << extract_discord_link(get_messages(bot, bulut_dosyalar[i], 1)) << endl;
-        }
-
-        std::cout << "\033[1;34m-----------------------------------------------------------------------" << std::endl;
-        std::cout << "\033[1;33mLütfen seçiminizi yapınız (numara giriniz):\033[0m" << std::endl;
-
-        int secim;
-        std::cin >> secim;
-
-        // Seçim kontrolü
-        if (secim > 0 && secim <= static_cast<int>(yerel_dosyalar.size() + bulut_dosyalar.size())) {
-            if (secim <= static_cast<int>(yerel_dosyalar.size())) {
-                dosya_yolu = yerel_dosyalar[secim - 1];
-            }
-            else {
-                // Bulut dosyası seçildiğinde
-                std::string selected_message_content = get_messages(bot, bulut_dosyalar[secim - 1 - yerel_dosyalar.size()], 1);
-                std::string download_link = extract_discord_link(selected_message_content);
-                std::string indirilen_dosya = "indirilen_dosya"; // Geçici dosya adı
-
-                // Dosyayı indir
-                if (dosya_indir(download_link, indirilen_dosya) == 0) {
-                    std::cout << "Dosya başarıyla indirildi: " << indirilen_dosya << std::endl;
-
-                    // İkinci satırı oku ve dosya adını belirle
-                    std::string yeni_dosya_adi = get_second_line(indirilen_dosya);
-                    if (!yeni_dosya_adi.empty()) {
-                        yeni_dosya_adi += ".txt"; // Dosya uzantısını ekleyin
-                        rename(indirilen_dosya.c_str(), yeni_dosya_adi.c_str()); // Dosya adını değiştir
-                        dosya_yolu = yeni_dosya_adi; // İndirilen dosyanın yeni yolunu güncelle
-                        std::cout << "Dosya adı değiştirildi: " << yeni_dosya_adi << std::endl;
-                    }
-                    else {
-                        std::cout << "\033[1;31mİkinci satır okunamadı. Dosya adı değiştirilemedi.\033[0m" << std::endl;
-                    }
-                }
-                else {
-                    std::cout << "\033[1;31mDosya indirme işlemi başarısız.\033[0m" << std::endl;
-                }
-            }
-            break;
-        }
-        else {
-            std::cout << "\033[1;31mGeçersiz seçim.\033[0m" << std::endl;
-        }
-    }
-}
+// buluttaki dosya listesi
 void dosya_gonder(const std::string& webhook_url, const std::string& dosya_yolu, const int& parca_no, const std::string& mesaj, const int& silme, const string& linkleridosyasi) {
     CURL* curl;
     CURLcode res;
@@ -513,13 +511,18 @@ void dosya_gonder(const std::string& webhook_url, const std::string& dosya_yolu,
             std::ofstream dosya2("gonderimlog.txt", std::ios::app);
             dosya2 << "Webhook Yanıtı: " << response.data << std::endl;
             dosya2.close();
-            url = url_bul(response.data);
-            if (!url.empty()) {
-                std::cout << "\033[1;34mBulunan URL: " << url << std::endl;
+            auto [oda_id2, mesaj_id2] = id_bul(response.data);
+            if (!mesaj_id2.empty()) {
                 if (silme == 1) {
                     std::ofstream dosya2(linkleridosyasi, std::ios::app);
-                    dosya2 << std::to_string(parca_no) + " " + url << std::endl;
+                    dosya2 << json_yaz(parca_no,oda_id2,mesaj_id2) << std::endl;
+                    cout << json_yaz(parca_no, oda_id2, mesaj_id2) << endl;
                     dosya2.close();
+                }
+                else {
+                    cout << json_yaz(parca_no, oda_id2, mesaj_id2) << endl;
+                    oda_id = oda_id2;
+                    mesaj_id = mesaj_id2;
                 }
             }
             else {
@@ -533,6 +536,122 @@ void dosya_gonder(const std::string& webhook_url, const std::string& dosya_yolu,
 
     curl_global_cleanup();
 }
+// weebhook ile dosyası gönderme
+int dosya_indir(const std::string& url, const std::string& dosya_adi) {
+    CURL* curl;
+    FILE* fp;
+    CURLcode res;
+
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    curl = curl_easy_init();
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+
+        if (fopen_s(&fp, dosya_adi.c_str(), "wb") != 0) {
+            std::cerr << "Dosya açılamadı: " << dosya_adi << std::endl;
+            return 1;
+        }
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+
+        res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        }
+
+        fclose(fp);
+        curl_easy_cleanup(curl);
+    }
+
+    curl_global_cleanup();
+    return 0;
+}
+//dosya indirme
+void dosya_sec(dpp::cluster& bot, const std::vector<std::string>& yerel_dosyalar, const std::vector<dpp::snowflake>& bulut_dosyalar, std::string& dosya_yolu) {
+    while (true) {
+        std::cout << "\033[1;33mMevcut dosyalar:\033[0m" << std::endl;
+
+        // Yerel dosyalar
+        std::cout << "\033[1;34mYerel Dosyalar:\033[0m" << std::endl;
+        for (size_t i = 0; i < yerel_dosyalar.size(); ++i) {
+            std::cout << i + 1 << ". " << yerel_dosyalar[i] << std::endl;
+        }
+
+        // Buluttaki dosyalar
+        std::cout << "\033[1;34mBuluttaki Dosyalar:\033[0m" << std::endl;
+        for (size_t i = 0; i < bulut_dosyalar.size(); ++i) {
+            string obj = get_messages(bot, bulut_dosyalar[i], 1);
+
+            // JSON formatında olup olmadığını kontrol et
+            try {
+                json json_obj = json::parse(obj);
+                std::cout << i + 1 + yerel_dosyalar.size() << ". " << json_obj["dosya_adi"] << std::endl;
+            }
+            catch (const json::parse_error& e) {
+                // JSON formatında değilse, hata ver ve geç
+                std::cout << "\033[1;31mBuluttaki dosya JSON formatında değil, geçiliyor...\033[0m" << std::endl;
+                continue;  // JSON hatası alırsak bu öğeyi atla
+            }
+        }
+
+        std::cout << "\033[1;34m-----------------------------------------------------------------------" << std::endl;
+        std::cout << "\033[1;33mLütfen seçiminizi yapınız (numara giriniz):\033[0m" << std::endl;
+
+        int secim;
+        std::cin >> secim;
+
+        // Seçim kontrolü
+        if (secim > 0 && secim <= static_cast<int>(yerel_dosyalar.size() + bulut_dosyalar.size())) {
+            if (secim <= static_cast<int>(yerel_dosyalar.size())) {
+                dosya_yolu = yerel_dosyalar[secim - 1];
+            }
+            else {
+                string obj = get_messages(bot, bulut_dosyalar[secim - 1 - yerel_dosyalar.size()], 1);
+
+                // JSON formatında olmasını bekliyoruz, ancak bunu tekrar kontrol edelim
+                try {
+                    json data = json::parse(obj);
+                    string oda_id = data["oda_id"];
+                    string mesaj_id = data["mesaj_id"];
+                    std::cout << "oda id: " << oda_id << " mesaj id: " << mesaj_id << std::endl;
+                    string download_link = get_file_url(oda_id, mesaj_id);
+                    std::string indirilen_dosya = "indirilen_dosya"; // Geçici dosya adı
+
+                    // Dosyayı indir
+                    if (dosya_indir(download_link, indirilen_dosya) == 0) {
+                        std::cout << "Dosya başarıyla indirildi: " << indirilen_dosya << std::endl;
+
+                        // İkinci satırı oku ve dosya adını belirle
+                        std::string yeni_dosya_adi = get_second_line(indirilen_dosya);
+                        if (!yeni_dosya_adi.empty()) {
+                            yeni_dosya_adi += ".txt"; // Dosya uzantısını ekleyin
+                            rename(indirilen_dosya.c_str(), yeni_dosya_adi.c_str()); // Dosya adını değiştir
+                            dosya_yolu = yeni_dosya_adi; // İndirilen dosyanın yeni yolunu güncelle
+                            std::cout << "Dosya adı değiştirildi: " << yeni_dosya_adi << std::endl;
+                        }
+                        else {
+                            std::cout << "\033[1;31mİkinci satır okunamadı. Dosya adı değiştirilemedi.\033[0m" << std::endl;
+                        }
+                    }
+                    else {
+                        std::cout << "\033[1;31mDosya indirme işlemi başarısız.\033[0m" << std::endl;
+                    }
+                }
+                catch (const json::parse_error& e) {
+                    std::cout << "\033[1;31mBulut dosyası JSON formatında değil, geçiliyor...\033[0m" << std::endl;
+                    continue;  // JSON hatası alırsak bu dosyayı atla
+                }
+            }
+            break;
+        }
+        else {
+            std::cout << "\033[1;31mGeçersiz seçim.\033[0m" << std::endl;
+        }
+    }
+}
+// dosya seçtirir dosya_yolu nu seçilen dosyanın adı yapar
 
 void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster& bot, size_t parca_boyutu = mbsinir * 1024 * 1024) {
     std::string linkler_txt = dosya_yolu + "_linkleri.txt";
@@ -556,12 +675,8 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
         getline(kontrol, olusturulanwebhook);
         if (trimWhitespaceAndSpecialChars(hash) == trimWhitespaceAndSpecialChars(getFileHash(dosya_yolu))) {
             while (std::getline(kontrol, son_satir)) {
-                std::istringstream iss(son_satir);
-                int parca_sayisi;
-                std::string url;
-                if (iss >> parca_sayisi >> url) {
-                    mevcut_parca_sayisi = parca_sayisi;
-                }
+                json json_obj = json::parse(son_satir);
+                mevcut_parca_sayisi = json_obj["parca_no"];
             }
             cout << "\033[1;31mAynı dosya tespit edildi kaldığı yerden devam ediyor.\n" << endl;
         }
@@ -574,7 +689,7 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
         kontrol.close();
     }
     else {
-        handle_channel_creation(bot, dosya_yolu, guild_id, category_id); // webhook oluşturuluyor
+        create_channel(bot, dosya_yolu, guild_id, category_id); // webhook oluşturuluyor
         std::this_thread::sleep_for(std::chrono::seconds(1));
         std::ofstream dosya2(linkler_txt, std::ios::app);
         dosya2 << toplam_parca << std::endl;
@@ -609,10 +724,18 @@ void dosyayi_parcalara_bol_ve_gonder(const std::string& dosya_yolu, dpp::cluster
 
     delete[] buffer;
     dosya.close();
-    dosya_gonder(olusturulanwebhook, linkler_txt, parca_no, dosya_yolu + "'nin indirme linkleri", 0, linkler_txt);
+    dosya_gonder(olusturulanwebhook, linkler_txt, parca_no, dosya_yolu + "'nin indirme linkleri\n```Dosyanin Anlami:\n1. Satir: Toplam Parca Sayisi\n2. Satir: Dosyanin Adi\n3. Satir: Dosyanin Hash Degeri\nSonraki Satirlar: Parca Numarasi, Oda Id, Mesaj Id```", 0, linkler_txt);
     dpp::webhook wh(olusturulanwebhook);
-    bot.execute_webhook_sync(wh, dpp::message(dosya_yolu + "'nin indirme linkleri: [Tikla](" + url + ")\nProgram linki: [Tikla](https://github.com/keremlolgg/DiscordStorage/releases/latest)"));
+   // bot.execute_webhook(wh, dpp::message(dosya_yolu + "'nin indirme bilgileri: ("+oda_id+mesaj_id+")\nProgram linki: [Tikla](https://github.com/keremlolgg/DiscordStorage/releases/latest)"));
+    bot.execute_webhook(wh, dpp::message("Program Linki: https://github.com/keremlolgg/DiscordStorage/releases/latest"));
+    json json_obj = {
+        {"dosya_adi", dosya_yolu},
+        {"oda_id", oda_id},
+        {"mesaj_id", mesaj_id}
+    };
+    bot.execute_webhook(wh, dpp::message(json_obj.dump()));
 }
+// secilen dosyayı parçalara ayırır ve gönderir
 void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
     std::ifstream linkler_dosyasi(linkler_dosya_adi);
     if (!linkler_dosyasi) {
@@ -621,11 +744,11 @@ void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
     }
 
     int toplam_parca = 0;
-    string hash;
+    std::string hash;
     std::string satir;
     std::string hedef_dosya_adi;
-    string webhook;
-    std::vector<std::pair<int, std::string>> linkler;
+    std::string webhook;
+    std::vector<Link> linkler;
 
     if (std::getline(linkler_dosyasi, satir)) {
         try {
@@ -650,50 +773,58 @@ void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
         return;
     }
     while (std::getline(linkler_dosyasi, satir)) {
-        std::istringstream iss(satir);
         int parca_numarasi;
-        std::string url;
+        std::string oda_id, mesaj_id;
+        json json_obj = json::parse(satir);
+        cout << json_obj << endl;
 
-        if (!(iss >> parca_numarasi >> url)) {
-            std::cerr << "Satır okunurken hata: " << satir << std::endl;
-            continue;
-        }
-
-        linkler.push_back({ parca_numarasi, url });
+        parca_numarasi = json_obj["parca_no"];
+        mesaj_id = json_obj["mesaj_id"];
+        oda_id = json_obj["oda_id"];
+        linkler.push_back({ parca_numarasi, oda_id, mesaj_id });
     }
     linkler_dosyasi.close();
 
+    // URL sayısının toplam parça sayısı ile uyumlu olup olmadığını kontrol ediyoruz
     if (linkler.size() != toplam_parca) {
+        cout << "Link Sayısı: " << linkler.size() << " Parça Sayısı: " << toplam_parca << endl;
         std::cerr << "URL sayısı toplam parça sayısıyla uyuşmuyor!" << std::endl;
         return;
     }
 
-    std::sort(linkler.begin(), linkler.end(), [](const std::pair<int, std::string>& a, const std::pair<int, std::string>& b) {
-        return a.first < b.first;
+    // Parçaları sırasına göre sıralıyoruz
+    std::sort(linkler.begin(), linkler.end(), [](const Link& a, const Link& b) {
+        return a.parca_numarasi < b.parca_numarasi;
         });
 
+    // Hedef dosyayı açıyoruz
     std::ofstream hedef_dosya(hedef_dosya_adi, std::ios::binary);
     if (!hedef_dosya) {
         std::cerr << "Hedef dosya açılamadı: " << hedef_dosya_adi << std::endl;
         return;
     }
 
+    // Paralel indirme işlemlerini başlatıyoruz
     std::vector<std::future<void>> paralel_indirmeler;
 
-    for (const auto& [parca_no, url] : linkler) {
-        std::string parca_dosyasi_adi = "parca" + std::to_string(parca_no) + ".txt";
+    for (const auto& link : linkler) {
+        std::string parca_dosyasi_adi = "parca" + std::to_string(link.parca_numarasi) + ".txt";
+        std::string url = get_file_url(link.oda_id, link.mesaj_id);
+        //cout << "Parça: "+ parca_dosyasi_adi+"\nUrl: " << url << "\nOda İd: " << link.oda_id << "\nMesaj İd: " << link.mesaj_id << endl;
 
         paralel_indirmeler.push_back(std::async(std::launch::async, [url, parca_dosyasi_adi]() {
             dosya_indir(url, parca_dosyasi_adi);
             }));
     }
 
+    // İndirme işlemleri tamamlanana kadar bekliyoruz
     for (auto& indirme : paralel_indirmeler) {
         indirme.get();
     }
 
-    for (const auto& [parca_no, url] : linkler) {
-        std::string parca_dosyasi_adi = "parca" + std::to_string(parca_no) + ".txt";
+    // İndirilen parçaları birleştiriyoruz
+    for (const auto& link : linkler) {
+        std::string parca_dosyasi_adi = "parca" + std::to_string(link.parca_numarasi) + ".txt";
         std::ifstream parca_dosyasi(parca_dosyasi_adi, std::ios::binary);
         if (parca_dosyasi) {
             hedef_dosya << parca_dosyasi.rdbuf();
@@ -704,18 +835,23 @@ void dosyalari_birlestir(const std::string& linkler_dosya_adi) {
             std::cerr << "Parça açılamadı: " << parca_dosyasi_adi << std::endl;
         }
 
+        // Parça dosyasını siliyoruz
         if (std::remove(parca_dosyasi_adi.c_str()) != 0) {
             std::cerr << "Parça dosyası silme hatası: " << parca_dosyasi_adi << std::endl;
         }
     }
 
     hedef_dosya.close();
+
+    // Oluşturulan dosyanın hash'ini kontrol ediyoruz
     if (getFileHash(hedef_dosya_adi) != hash) {
-        cout << "\033[1;31mOluşturulan dosya ile yüklenen dosya hashleri tutmuyor!" << endl;
+        std::cout << "\033[1;31mOluşturulan dosya ile yüklenen dosya hashleri tutmuyor!" << std::endl;
     }
-    else
-        cout << "\033[1;31mOluşturulan dosya ile yüklenen dosya hashleri aynı!" << endl;
+    else {
+        std::cout << "\033[1;31mOluşturulan dosya ile yüklenen dosya hashleri aynı!" << std::endl;
+    }
 }
+// secilen dosyaları indirir birleştirir ardından geçici dosyaları siler
 
 int main() {
     setlocale(LC_ALL, "Turkish");
@@ -725,13 +861,24 @@ int main() {
     dpp::cluster bot(envData["BOT_TOKEN"], dpp::i_default_intents | dpp::i_message_content);
     guild_id = envData["guild_id"]; string mbsinir_str = envData["mbsinir"]; mbsinir = stoi(mbsinir_str); category_id = envData["category_id"];
     bot.on_ready([&bot](const dpp::ready_t& event) {
-        bot.set_presence(dpp::presence(dpp::ps_online, dpp::at_game, "Dosya yukleyici aktif"));
-        });
+        if (dpp::run_once<struct register_bot_commands>()) {
+            dpp::slashcommand ping("ping", "pong!", bot.me.id);
+            bot.global_bulk_command_create({ ping });
+        }
+ 
+        bot.set_presence(dpp::presence(dpp::ps_online, dpp::at_game, "Github: Keremlolgg/DiscordDepolama"));
+    });
+    bot.on_slashcommand([](const dpp::slashcommand_t& event) {
+        if (event.command.get_command_name() == "ping") {
+            event.reply("pong!");
+            std::cout << "Pong!" << endl;
+        }
+    });
     std::thread bot_thread([&bot]() {
         bot.start(dpp::st_wait);
-        });
+    });
     while (true) {
-        cout << "\033[1;31mProgram Sahibi Kerem Kuyucu.\n";
+        std::cout << "\033[1;31mProgram Sahibi Kerem Kuyucu.\n";
         cout << "\033[1;34m-----------------------------------------------------------------------" << endl;
         cout << "\033[1;33mLütfen 'Yedekle', 'İndir' veya 'hatalı-dosyayı-yükle' seçeneğini giriniz:" << endl;
         cout << "1. Yedekle" << endl;
@@ -741,7 +888,7 @@ int main() {
         cin.ignore();
 
         if (secim != "1" && secim != "2" && secim != "3") {
-            cout << "\033[1;31mGeçersiz seçim. Lütfen 'Yedekle', 'İndir' seçeneğini giriniz.\033[0m" << endl;
+            cout << "\033[1;31mGeçersiz seçim. Lütfen 'Yedekle', 'İndir' veya 'hatalı-dosyayı-yükle' seçeneğini giriniz:\033[0m" << endl;
             continue; // Geçersiz seçimde döngünün başına dön
         }
 
@@ -756,8 +903,12 @@ int main() {
             dosya_sec(bot, dosyalar, bulut_dosyalar, dosya_yolu);
             if (!dosya_yolu.empty()) {
                 dosyayi_parcalara_bol_ve_gonder(dosya_yolu, bot);
-                cout << "\033[1;33mLütfen " + dosya_yolu + "_linkleri.txt dosyasını saklayın. O linkler sayesinde dosyanızı tekrar indirebilirsiniz.\033[0m" << endl;
-                cout << "\033[1;33mEğer silinmeyen parça varsa o yüklenmemiş olabilir lütfen o parçayı kontrol edin ve parçayı elle yükleyerek olması gereken yere ekleyin.\033[0m" << endl;
+                cout << "\n\n\n\n\n";
+                cout << "\033[1;33mLütfen " + dosya_yolu + "_linkleri.txt dosyasını saklayın. O dosya sayesinde dosyanızı tekrar indirebilirsiniz.\033[0m" << endl;
+                cout << "\033[1;34mOdaya Sakın Mesaj yazmayın.\033[0m" << endl;
+                cout << "\033[1;33mEğer silinmeyen parça varsa o yüklenmemiş olabilir lütfen o parçayı kontrol edin ve parçayı elle yükleyerek\noda ve mesaj id sini olması gereken yere ekleyin.\033[0m" << endl;
+                cout << "\033[1;33mLütfen bu yedeği dosyanın tek yedeği olarak tutmayın alternatif olarak saklayın.\033[0m" << endl;
+                cout << "\033[1;34mNe Demişler: Veriniz üç yerde yoksa o veri yok demektir.\033[0m" << endl;
             }
         }
         else if (secim == "2") {
@@ -772,8 +923,8 @@ int main() {
 
             if (!dosya_yolu.empty()) {
                 dosyalari_birlestir(dosya_yolu);
+                cout << "\033[1;31mDosya indirildi!" << endl;
             }
-            cout << "\033[1;31mDosya indirildi!" << endl;
         }
         else if (secim == "3") {
             string hataliwebhook;

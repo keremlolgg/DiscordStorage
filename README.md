@@ -37,10 +37,9 @@ Dosyayı yükledikten sonra odaya herhangi bir mesaj atmayın botun bulut depola
 
    ```plaintext
    BOT_TOKEN=your_token
-   category_id=0
+   category_id=category_id
    guild_id=your_storage_server
-   mbsinir=23
-   webhook_log=your_log_webhook_url
+   mbsinir=8
    ```
 
 4. Projeyi derleyin:
@@ -65,4 +64,4 @@ Bu proje [GPL Lisansı](LICENSE) altında lisanslanmıştır.
 
 ## İletişim
 
-Herhangi bir sorun veya öneri için lütfen benimle iletişime geçin.
+Herhangi bir sorun veya öneri için lütfen benimle iletişime geçin. [İletişim](https://keremkk.glitch.me/contact)

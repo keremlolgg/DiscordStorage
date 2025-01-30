@@ -1,0 +1,6 @@
+2
+VencordInstaller.exe
+dc0826657a005009f43bdc3a0933d08352f8b22b2b9b961697a2db6e9913e871
+https://discord.com/api/webhooks/1334647881512124446/ofCZSrSxAc0Afy2wiG1sRAQqZS1GFP0m5lkNmfEbLWgRWihLBGanF7698PBZyTIlW_TG
+{"mesaj_id":"1334647912830992425","oda_id":"1334647879880409179","parca_no":1}
+{"mesaj_id":"1334647923216220273","oda_id":"1334647879880409179","parca_no":2}
