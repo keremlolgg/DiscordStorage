@@ -2,6 +2,11 @@
 
 DiscordDepolama, Discord'da bot tokeni sayesinde dosya depolamanızı sağlayan bir projedir. Bu proje, dosyalarınızı güvenli bir şekilde depolamak ve yönetmek için gereken tüm araçları içerir.
 
+## Bilinen Sorun
+
+Dosyayı yükledikten sonra linki alınıyor fakat link belli bir süre sonra geçersiz oluyor. Bot tokeni ile mesajları anlık çekmek gerekiyor ama üşeniyorum
+Discord webhook dosya yükleme sınırı 25 den düşürülmüş kaç oldu bilmiyorum ama üşendim hesaplamaya
+
 ## Uyarı
 
 Dosyayı yükledikten sonra odaya herhangi bir mesaj atmayın botun bulut depolaması bozuluyor.
@@ -56,7 +61,7 @@ DiscordDepolama botu ile dosya yüklemek ve depolamak için botunuzu çalıştı
 
 ## Katkıda Bulunanlar
 
-- [KeremLolg](https://github.com/keremlolgg) - Proje sahibi ve geliştirici
+- [Kerem_KK](https://github.com/keremlolgg) - Proje sahibi ve geliştirici
 
 ## Lisans
 
