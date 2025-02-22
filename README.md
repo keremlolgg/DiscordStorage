@@ -2,6 +2,12 @@
 
 DiscordDepolama, Discord'da bot tokeni sayesinde dosya depolamanızı sağlayan bir projedir. Bu proje, dosyalarınızı güvenli bir şekilde depolamak ve yönetmek için gereken tüm araçları içerir.
 
+![GitHub repo size](https://img.shields.io/github/repo-size/keremlolgg/DiscordStorage)
+![GitHub stars](https://img.shields.io/github/stars/keremlolgg/DiscordStorage?style=social)
+![GitHub forks](https://img.shields.io/github/forks/keremlolgg/DiscordStorage?style=social)
+![GitHub issues](https://img.shields.io/github/issues/keremlolgg/DiscordStorage)
+![GitHub license](https://img.shields.io/github/license/keremlolgg/DiscordStorage)
+
 ## Uyarı
 
 Dosyayı yükledikten sonra odaya herhangi bir mesaj atmayın botun bulut depolaması bozuluyor.
