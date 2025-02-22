@@ -7,17 +7,11 @@ DiscordDepolama, Discord'da bot tokeni sayesinde dosya depolamanızı sağlayan 
 ![GitHub forks](https://img.shields.io/github/forks/keremlolgg/DiscordStorage?style=social)
 ![GitHub issues](https://img.shields.io/github/issues/keremlolgg/DiscordStorage)
 ![GitHub license](https://img.shields.io/github/license/keremlolgg/DiscordStorage)
-![GitHub all releases](https://img.shields.io/github/downloads/keremlolgg/GeoGame/total?logo=github&style=for-the-badge&color=blue&label=Total%20Downloads)  
-![GitHub stars](https://img.shields.io/github/stars/keremlolgg/GeoGame?style=for-the-badge)  
-![GitHub forks](https://img.shields.io/github/forks/keremlolgg/GeoGame?style=for-the-badge)  
-![GitHub repo size](https://img.shields.io/github/repo-size/keremlolgg/geogame?style=for-the-badge)
-![License](https://img.shields.io/github/license/keremlolgg/GeoGame?style=for-the-badge)  
-![Last Commit](https://img.shields.io/github/last-commit/keremlolgg/GeoGame?style=for-the-badge)  
-![Made with Flutter](https://img.shields.io/badge/Made%20with-Flutter-blue?style=for-the-badge&logo=flutter)  
+![GitHub all releases](https://img.shields.io/github/downloads/keremlolgg/DiscordStorage/total?logo=github&style=for-the-badge&color=blue&label=Total%20Downloads)
 
 ## Uyarı
 
-Dosyayı yükledikten sonra odaya herhangi bir mesaj atmayın botun bulut depolaması bozuluyor.
+Dosyayı yükledikten sonra odaya herhangi bir mesaj atmayın, botun bulut depolaması bozuluyor.
 
 ## Özellikler
 
@@ -35,37 +29,37 @@ Dosyayı yükledikten sonra odaya herhangi bir mesaj atmayın botun bulut depola
 
 1. Projeyi klonlayın:
 
-   ```bash
-   git clone https://github.com/keremlolgg/DiscordStorage.git
-   cd DiscordStorage
-   ```
+    ```bash
+    git clone https://github.com/keremlolgg/DiscordStorage.git
+    cd DiscordStorage
+    ```
 
 2. Gerekli kütüphaneleri yükleyin:
 
-   LibCurl ve Dpp kütüphanelerini sisteminize yükleyin. Her iki kütüphanenin de kurulum adımlarını kendi resmi belgelerinden bulabilirsiniz.
+    LibCurl ve Dpp kütüphanelerini sisteminize yükleyin. Her iki kütüphanenin de kurulum adımlarını kendi resmi belgelerinden bulabilirsiniz.
 
 3. `.env` isimli bir dosya oluşturun:
 
-   Aşağıdaki içeriği `.env` dosyasına ekleyin:
+    Aşağıdaki içeriği `.env` dosyasına ekleyin:
 
-   ```plaintext
-   BOT_TOKEN=your_token
-   category_id=category_id
-   guild_id=your_storage_server
-   mbsinir=8
-   ```
+    ```plaintext
+    BOT_TOKEN=your_token
+    category_id=category_id
+    guild_id=your_storage_server
+    mbsinir=8
+    ```
 
 4. Projeyi derleyin:
 
-   Projenizi Visual Studio veya tercih ettiğiniz bir C++ IDE ile derleyin.
+    Projenizi Visual Studio veya tercih ettiğiniz bir C++ IDE ile derleyin.
 
 5. Botunuzu başlatın:
 
-   Derleme tamamlandıktan sonra, botunuzu başlatmak için çalıştırın.
+    Derleme tamamlandıktan sonra, botunuzu başlatmak için çalıştırın.
 
 ## Kullanım
 
-DiscordDepolama botu ile dosya yüklemek ve depolamak için botunuzu çalıştırdıktan sonra Discord sunucunuzda botunuza gerekli izinleri verin. İlgili komutları kullanarak dosyalarınızı depolamaya başlayabilirsiniz.
+DiscordDepolama botu ile dosya yüklemek ve depolamak için botunuzu çalıştırdıktan sonra Discord sunucunuzda botunuza gerekli izinleri verin. İlgili komutları kullanarak dosyalarınızı depolayabilirsiniz.
 
 ## Katkıda Bulunanlar
 
