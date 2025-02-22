@@ -7,7 +7,7 @@ DiscordDepolama, Discord'da bot tokeni sayesinde dosya depolamanızı sağlayan 
 ![GitHub forks](https://img.shields.io/github/forks/keremlolgg/DiscordStorage?style=social)
 ![GitHub issues](https://img.shields.io/github/issues/keremlolgg/DiscordStorage)
 ![GitHub license](https://img.shields.io/github/license/keremlolgg/DiscordStorage)
-![GitHub all releases](https://img.shields.io/github/downloads/keremlolgg/DiscordStorage/total?logo=github&style=for-the-badge&color=blue&label=Total%20Downloads)
+![GitHub all releases](https://img.shields.io/github/downloads/keremlolgg/DiscordStorage/total)
 
 ## Uyarı
 
