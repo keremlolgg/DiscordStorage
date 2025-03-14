@@ -23,7 +23,7 @@ After uploading a file, do not send any messages to the channel, as it will disr
 
 ## Requirements
 
-- C++ compiler (C++11 or higher)
+- C++ compiler (C++17 or higher)
 - [LibCurl](https://curl.se/libcurl/)
 - [DPP](https://dpp.dev/) library
 
