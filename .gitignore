@@ -7,3 +7,4 @@ obj/
 * .ipch
 /.vs/
 /config.json
+/postlog.txt
