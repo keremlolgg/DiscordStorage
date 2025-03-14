@@ -52,7 +52,7 @@ After uploading a file, do not send any messages to the channel, as it will disr
 
 To upload and store files with the DiscordStorage bot, give your bot the necessary permissions on your Discord server after starting it. You can then use the relevant commands to store your files.
 
-The application will automatically log file transfers in the `gonderimlog.txt` file.
+The application will automatically log file transfers in the `postlog.txt` file.
 
 ## How It Works
 
