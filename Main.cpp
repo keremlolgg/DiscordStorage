@@ -52,11 +52,6 @@ struct Link {
     std::string channelId;
     std::string messageId;
 };
-size_t write_data(void* buf, size_t size, size_t nmemb, FILE* userp) {
-    size_t written = fwrite(buf, size, nmemb, userp);
-    return written;
-}
-// libcurl 
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t total_size = size * nmemb;
     Response* response = static_cast<Response*>(userp);
@@ -64,93 +59,56 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     return total_size;
 }
 // libcurl 
-std::string trimWhitespaceAndSpecialChars(const std::string& str) {
-    std::string result = str;
-
-    // Başındaki ve sonundaki boşlukları ve \r karakterlerini sil
-    result.erase(result.begin(), std::find_if(result.begin(), result.end(), [](unsigned char c) {
-        return !std::isspace(c) && c != '\r';
-        }));
-    result.erase(std::find_if(result.rbegin(), result.rend(), [](unsigned char c) {
-        return !std::isspace(c) && c != '\r';
-        }).base(), result.end());
-
-    return result;
+size_t write_data(void* buf, size_t size, size_t nmemb, FILE* userp) {
+    size_t written = fwrite(buf, size, nmemb, userp);
+    return written;
 }
-// delete unsupported characters
+// libcurl 
 std::string getFileHash(const std::string& filename) {
     std::string command = "CertUtil -hashfile \"" + filename + "\" SHA256";
-    STARTUPINFOA startupInfo;
-    PROCESS_INFORMATION processInfo;
-    ZeroMemory(&startupInfo, sizeof(startupInfo));
-    ZeroMemory(&processInfo, sizeof(processInfo));
-    startupInfo.cb = sizeof(startupInfo);
-    startupInfo.dwFlags |= STARTF_USESTDHANDLES;
-    SECURITY_ATTRIBUTES sa;
-    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-    sa.bInheritHandle = TRUE;
-    sa.lpSecurityDescriptor = NULL;
+    SECURITY_ATTRIBUTES sa{ sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+    HANDLE hRead, hWrite;
 
-    HANDLE hReadPipe, hWritePipe;
-    if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
-        std::cerr << "Failed to create Pipe! Error code: " << GetLastError() << std::endl;
+    if (!CreatePipe(&hRead, &hWrite, &sa, 0)) return "";
+
+    STARTUPINFOA si{};
+    PROCESS_INFORMATION pi{};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = hWrite;
+    si.hStdError = hWrite;
+
+    if (!CreateProcessA(NULL, const_cast<char*>(command.c_str()), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        CloseHandle(hWrite);
+        CloseHandle(hRead);
         return "";
     }
-    startupInfo.hStdOutput = hWritePipe;
-    startupInfo.hStdError = hWritePipe;
-    if (!CreateProcessA(NULL, const_cast<char*>(command.c_str()), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &startupInfo, &processInfo)) {
-        CloseHandle(hWritePipe);
-        CloseHandle(hReadPipe);
-        std::cerr << "Process could not be created! Error code: " << GetLastError() << std::endl;
-        return "";
-    }
-    CloseHandle(hWritePipe);
-    std::array<char, 128> buffer;
+
+    CloseHandle(hWrite);
+    char buffer[128];
     std::string result;
     DWORD bytesRead;
-    while (ReadFile(hReadPipe, buffer.data(), buffer.size() - 1, &bytesRead, NULL) && bytesRead > 0) {
+
+    while (ReadFile(hRead, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead) {
         buffer[bytesRead] = '\0';
-        result += buffer.data();
-    }
-    CloseHandle(hReadPipe);
-    WaitForSingleObject(processInfo.hProcess, INFINITE);
-    CloseHandle(processInfo.hProcess);
-    CloseHandle(processInfo.hThread);
-
-    std::ofstream outFile("result.txt");
-    if (outFile.is_open()) {
-        outFile << result;  
-        outFile.close();
-    }
-    else {
-        std::cerr << "The file could not be opened!" << std::endl;
-        return "";
+        result += buffer;
     }
 
-    std::ifstream inFile("result.txt");
-    std::string line;
-    std::string secondLine;
+    CloseHandle(hRead);
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
 
-    if (inFile.is_open()) {
-        int lineCount = 0;
-        while (std::getline(inFile, line)) {
-            lineCount++;
-            if (lineCount == 2) { 
-                secondLine = line;
-                break;
-            }
+    // Extract hash value from CertUtil output
+    size_t start = result.find("\n");
+    if (start != std::string::npos) {
+        start = result.find("\n", start + 1);
+        if (start != std::string::npos) {
+            size_t end = result.find("\n", start + 1);
+            return result.substr(start + 1, end - start - 1);
         }
-        inFile.close();
     }
-    else {
-        std::cerr << "The file could not be opened!" << std::endl;
-        return "";
-    }
-    if (std::remove("result.txt") != 0) {
-        std::cerr << "File deletion error: result.txt" << std::endl;
-    }
-    // return secondline
-    return secondLine;
+    return "";
 }
 // hash calculation
 std::pair<std::string, std::string> id_bul(const std::string& json_str) {
@@ -292,7 +250,7 @@ std::string json_write(int parca_no, const std::string& channelId, const std::st
     nlohmann::json json_obj;
     json_obj["partNo"] = parca_no;
     json_obj["channelId"] = channelId;
-    json_obj["MessageId"] = messageId;
+    json_obj["messageId"] = messageId;
 
     // JSON'u string olarak döndür
     std::string json_string = json_obj.dump();
@@ -368,6 +326,7 @@ std::vector<std::string> fileList(const std::string& yol) {
         "Main.cpp",
         "LICENSE",
         "git",
+        ".gitignore",
         "README.md",
         "Özellik.props"
     };
@@ -536,16 +495,16 @@ void chooseFile(dpp::cluster& bot, const std::vector<std::string>& yerel_dosyala
         std::cout << "\033[1;34m-----------------------------------------------------------------------" << std::endl;
         std::cout << "\033[1;33mPlease make your selection (enter number):\033[0m" << std::endl;
 
-        int secim;
-        std::cin >> secim;
+        int input;
+        std::cin >> input;
 
         // Selection control
-        if (secim > 0 && secim <= static_cast<int>(yerel_dosyalar.size() + cloudFiles.size())) {
-            if (secim <= static_cast<int>(yerel_dosyalar.size())) {
-                filePath = yerel_dosyalar[secim - 1];
+        if (input > 0 && input <= static_cast<int>(yerel_dosyalar.size() + cloudFiles.size())) {
+            if (input <= static_cast<int>(yerel_dosyalar.size())) {
+                filePath = yerel_dosyalar[input - 1];
             }
             else {
-                string obj = get_messages(bot, cloudFiles[secim - 1 - yerel_dosyalar.size()], 1);
+                string obj = get_messages(bot, cloudFiles[input - 1 - yerel_dosyalar.size()], 1);
 
                 // We expect it to be in JSON format, but let's check this again
                 try {
@@ -610,7 +569,7 @@ void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t p
         getline(control, lastLine);
         getline(control, hash);
         getline(control, createdWebhook);
-        if (trimWhitespaceAndSpecialChars(hash) == trimWhitespaceAndSpecialChars(getFileHash(filePath))) {
+        if (hash == getFileHash(filePath)) {
             while (std::getline(control, lastLine)) {
                 json json_obj = json::parse(lastLine);
                 availablePartNumber = json_obj["parca_no"];
@@ -647,29 +606,28 @@ void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t p
     file.seekg(parca_boyutu * (availablePartNumber), std::ios::beg);
     while (!file.eof()) {
         file.read(buffer, parca_boyutu);
-        std::streamsize bytes_okunan = file.gcount();
+        std::streamsize bytes_read = file.gcount();
 
-        if (bytes_okunan <= 0) {
+        if (bytes_read <= 0) {
             break;
         }
 
         std::string newFileName = filePath + " part" + std::to_string(parca_no) + ".txt";
 
         std::ofstream parca_dosyasi(newFileName, std::ios::binary);
-        parca_dosyasi.write(buffer, bytes_okunan);
+        parca_dosyasi.write(buffer, bytes_read);
         parca_dosyasi.close();
 
-        std::string mesaj = filePath + "'part of No: " + std::to_string(parca_no);
-        fileUpload(createdWebhook, newFileName, parca_no, mesaj, 1, linkler_txt);
+        std::string message = filePath + "'part of No: " + std::to_string(parca_no);
+        fileUpload(createdWebhook, newFileName, parca_no, message, 1, linkler_txt);
         parca_no++;
     }
 
     delete[] buffer;
     file.close();
-    fileUpload(createdWebhook, linkler_txt, parca_no, filePath + "'s download links\n````File Meaning:\n1. Line: Total Number of Parts\nLine 2: File Name\nLine 3: Hash Value of File\nNext Lines: Track Number, Room Id, Message Id```", 0, linkler_txt);
+    fileUpload(createdWebhook, linkler_txt, parca_no, filePath + "'s download links\n````File Meaning:\n1. Line: Total Number of Parts\nLine 2: File Name\nLine 3: Hash Value of File\nLine 4: Webhook Link\nNext Lines: Track Number, Room Id, Message Id```", 0, linkler_txt);
     dpp::webhook wh(createdWebhook);
-    // bot.execute_webhook(wh, dpp::message(filePath + "'nin indirme bilgileri: ("+channelId+messageId+")\nProgram linki: [Tikla](https://github.com/keremlolgg/DiscordStorage/releases/latest)"));
-    bot.execute_webhook(wh, dpp::message("Program Link: https://github.com/keremlolgg/DiscordStorage/releases/latest"));
+    bot.execute_webhook(wh, dpp::message("Program Link: <https://github.com/keremlolgg/DiscordStorage>"));
     json json_obj = {
         {"fileName", filePath},
         {"channelId", channelId},
@@ -720,9 +678,9 @@ void mergeFiles(dpp::cluster& bot, const std::string& linkler_dosya_adi) {
         json json_obj = json::parse(line);
         cout << json_obj << endl;
 
+        messageId = json_obj["messageId"];
+        channelId = json_obj["channelId"];
         parca_numarasi = json_obj["partNo"];
-        messageId = json_obj["MessageId"];
-        channelId = json_obj["ChannelId"];
         linkler.push_back({ parca_numarasi, channelId, messageId });
     }
     linkler_dosyasi.close();
@@ -797,7 +755,7 @@ void mergeFiles(dpp::cluster& bot, const std::string& linkler_dosya_adi) {
 
 int main() {
     setlocale(LC_ALL, "Turkish");
-    string secim = "";
+    string input = "";
     std::vector<dpp::snowflake> cloudFiles;
     json configData = parseConfigFile();
     dpp::cluster bot(configData["BOT_TOKEN"].get<std::string>(), dpp::i_default_intents | dpp::i_message_content);
@@ -828,15 +786,15 @@ int main() {
         cout << "1. Backup" << endl;
         cout << "2. Download" << endl;
         cout << "3. upload-error-file" << endl;
-        cin >> secim;
+        cin >> input;
         cin.ignore();
 
-        if (secim != "1" && secim != "2" && secim != "3") {
+        if (input != "1" && input != "2" && input != "3") {
             cout << "\033[1;31mGeçersiz seçim. Please enter 'Backup', 'Download' or 'upload-error-file':\033[0m" << endl;
             continue; // Return to the beginning of the cycle in an invalid election
         }
 
-        if (secim == "1") {
+        if (input == "1") {
             // Yedekleme işlemleri
             string filePath;
             cout << "\033[1;34mPlease encrypt sensitive data before uploading for your security.\033[0m" << endl;
@@ -857,7 +815,7 @@ int main() {
                 cout << "\033[1;31m-----------------------------------------------------------------------" << endl;
             }
         }
-        else if (secim == "2") {
+        else if (input == "2") {
             // İndirme işlemleri
             string filePath;
             cout << "\033[1;33mPlease select the file \"filename\"_links.txt.\033[0m" << endl;
@@ -872,7 +830,7 @@ int main() {
                 cout << "\033[1;31mFile downloaded!" << endl;
             }
         }
-        else if (secim == "3") {
+        else if (input == "3") {
             string hataliwebhook;
             string filePath;
             cout << "Please enter a webhook link to upload the faulty file: (Please create an error file room and create a webhook link from there.)" << endl;
