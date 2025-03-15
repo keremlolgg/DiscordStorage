@@ -25,7 +25,8 @@ After uploading a file, do not send any messages to the channel, as it will disr
 
 - C++ compiler (C++17 or higher)
 - [LibCurl](https://curl.se/libcurl/)
-- [DPP](https://dpp.dev/) library
+- [DPP](https://dpp.dev/)
+- [nlohmann/json](https://github.com/nlohmann/json)
 
 ## Installation
 
