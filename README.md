@@ -2,13 +2,6 @@
 
 DiscordStorage is a project that allows you to store files on Discord using a bot token. This project includes all the tools you need to securely store and manage your files.
 
-![GitHub repo size](https://img.shields.io/github/repo-size/keremlolgg/DiscordStorage)
-![GitHub stars](https://img.shields.io/github/stars/keremlolgg/DiscordStorage?style=social)
-![GitHub forks](https://img.shields.io/github/forks/keremlolgg/DiscordStorage?style=social)
-![GitHub issues](https://img.shields.io/github/issues/keremlolgg/DiscordStorage)
-![GitHub license](https://img.shields.io/github/license/keremlolgg/DiscordStorage)
-![GitHub all releases](https://img.shields.io/github/downloads/keremlolgg/DiscordStorage/total)
-
 ## Warning
 
 After uploading a file, do not send any messages to the channel, as it will disrupt the bot's cloud storage functionality.
