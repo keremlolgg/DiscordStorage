@@ -1,4 +1,6 @@
-﻿#include <iostream>
+﻿#define NOMINMAX
+#include <algorithm>
+#include <iostream>
 #include <locale>
 #include <regex>
 #include <CURL/curl/curl.h>
@@ -6,10 +8,11 @@
 #include <dpp/dpp.h>
 using namespace std;
 using namespace dpp;
-int fileSize = 8;
-
+size_t fileSize = 8;
+size_t part_size = 8 * 1024 * 1024;
 string channelId, messageId, createdWebhook, guild_id, category_id;
 using json = nlohmann::json;
+
 json parseConfigFile() {
     json configData;
     std::ifstream file("config.json");
@@ -175,7 +178,7 @@ string get_messages(dpp::cluster& bot, dpp::snowflake channel_id, int64_t limit)
         std::string contents;
 
         for (const auto& x : messages) {
-            contents += x.second.content + '\n'; 
+            contents += x.second.content + '\n';
         }
 
         promise.set_value(contents); // Return message content
@@ -258,13 +261,27 @@ std::string json_write(int parca_no, const std::string& channelId, const std::st
 
     return json_string;  // JSON stringini döndür
 }
-
+// json write function
+void printProgressBar(int current, int total, int barWidth = 50) {
+    float progress = static_cast<float>(current) / total;
+    int pos = static_cast<int>(barWidth * progress);
+    std::cout << "\r[";
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+    std::cout << "] " << int(progress * 100.0) << "% (" << current << "/" << total << ")";
+    std::cout.flush();
+    if (current == total) std::cout << std::endl;
+}
+// progress bar
 void createWebhook(dpp::cluster& bot, const std::string& channel_id, const std::string& name) {
     dpp::webhook wh;
-    wh.name = name; 
-    wh.channel_id = channel_id;  
+    wh.name = name;
+    wh.channel_id = channel_id;
 
-    string webhook_url; 
+    string webhook_url;
 
     bot.create_webhook(wh, [&webhook_url](const dpp::confirmation_callback_t& callback) {
         if (callback.is_error()) {
@@ -549,35 +566,34 @@ void chooseFile(dpp::cluster& bot, const std::vector<std::string>& yerel_dosyala
 }
 // selects a file, makes file_path the name of the selected file
 
-void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t parca_boyutu = fileSize * 1024 * 1024) {
-    std::string linkler_txt = filePath + "_links.txt";
+void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t part_size = 8 * 1024 * 1024) {
+    std::string links_txt = filePath + "_links.txt";
     int availablePartNumber = 0;
-    string hash;
+    std::string hash;
     std::ifstream file(filePath, std::ios::binary);
     if (!file) {
-        std::cerr << "The file could not be opened: " << filePath << std::endl;
+        std::cerr << "Error: Could not open file: " << filePath << std::endl;
         return;
     }
     file.seekg(0, std::ios::end);
     size_t fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
-    int toplam_parca = static_cast<int>((fileSize + parca_boyutu - 1) / parca_boyutu);
-    std::ifstream control(linkler_txt);
+    size_t totalParts = static_cast<size_t>((fileSize + part_size - 1) / part_size);
+    std::ifstream control(links_txt);
     if (control) {
         std::string lastLine;
         getline(control, lastLine);
         getline(control, lastLine);
         getline(control, hash);
-        getline(control, createdWebhook);
+        getline(control, lastLine);
         if (hash == getFileHash(filePath)) {
             while (std::getline(control, lastLine)) {
                 json json_obj = json::parse(lastLine);
-                availablePartNumber = json_obj["parca_no"];
+                availablePartNumber = json_obj["part_no"];
             }
-            cout << "\033[1;31mThe same file has been detected and resumed.\n" << endl;
         }
         else {
-            cout << "\033[1;31mA different file with the same name has been detected, please delete or move the other file." << endl;
+            std::cerr << "Error: A different file with the same name detected. Please delete or move the other file." << std::endl;
             control.close();
             file.close();
             return;
@@ -586,169 +602,124 @@ void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t p
     }
     else {
         createChannel(bot, filePath, guild_id, category_id);
-        cout << "\033[1;33mPlease wait 3 seconds.\033[0m" << endl;
         std::this_thread::sleep_for(std::chrono::seconds(3));
-        std::ofstream file2(linkler_txt, std::ios::app);
+        std::ofstream file2(links_txt, std::ios::app);
         if (file2.is_open()) {
-            file2 << toplam_parca << std::endl;
+            file2 << totalParts << std::endl;
             file2 << filePath << std::endl;
             file2 << getFileHash(filePath) << std::endl;
             file2 << createdWebhook << std::endl;
             file2.close();
         }
         else {
-            std::cerr << "File opening error: " << linkler_txt << std::endl;
-        }
-    }
-    char* buffer = new char[parca_boyutu];
-    cout << "\033[1;31mTotal number of items to be loaded." << toplam_parca << endl;
-    int parca_no = availablePartNumber + 1;
-    file.seekg(parca_boyutu * (availablePartNumber), std::ios::beg);
-    while (!file.eof()) {
-        file.read(buffer, parca_boyutu);
-        std::streamsize bytes_read = file.gcount();
-
-        if (bytes_read <= 0) {
-            break;
-        }
-
-        std::string newFileName = filePath + " part" + std::to_string(parca_no) + ".txt";
-
-        std::ofstream parca_dosyasi(newFileName, std::ios::binary);
-        parca_dosyasi.write(buffer, bytes_read);
-        parca_dosyasi.close();
-
-        std::string message = filePath + "'part of No: " + std::to_string(parca_no);
-        fileUpload(createdWebhook, newFileName, parca_no, message, 1, linkler_txt);
-        parca_no++;
-    }
-
-    delete[] buffer;
-    file.close();
-    fileUpload(createdWebhook, linkler_txt, parca_no, filePath + "'s download links\n````File Meaning:\n1. Line: Total Number of Parts\nLine 2: File Name\nLine 3: Hash Value of File\nLine 4: Webhook Link\nNext Lines: Track Number, Room Id, Message Id```", 0, linkler_txt);
-    dpp::webhook wh(createdWebhook);
-    bot.execute_webhook(wh, dpp::message("Program Link: <https://github.com/keremlolgg/DiscordStorage>"));
-    json json_obj = {
-        {"fileName", filePath},
-        {"channelId", channelId},
-        {"messageId", messageId}
-    };
-    bot.execute_webhook(wh, dpp::message(json_obj.dump()));
-}
-// splits the selected file and sends it
-void mergeFiles(dpp::cluster& bot, const std::string& linkler_dosya_adi) {
-    std::ifstream linkler_dosyasi(linkler_dosya_adi);
-    if (!linkler_dosyasi) {
-        std::cerr << "The links file could not be opened: " << linkler_dosya_adi << std::endl;
-        return;
-    }
-
-    int toplam_parca = 0;
-    std::string hash;
-    std::string line;
-    std::string hedef_dosya_adi;
-    std::string webhook;
-    std::vector<Link> linkler;
-
-    if (std::getline(linkler_dosyasi, line)) {
-        try {
-            toplam_parca = std::stoi(line);
-        }
-        catch (const std::exception& e) {
-            std::cerr << "Total number of pieces unreadable: " << e.what() << std::endl;
+            std::cerr << "Error: Could not create links file: " << links_txt << std::endl;
             return;
         }
     }
-
-    if (!std::getline(linkler_dosyasi, hedef_dosya_adi)) {
-        std::cerr << "The destination file name could not be read!" << std::endl;
+    std::vector<char> buffer(part_size);
+    for (size_t i = 0; i < totalParts; ++i) {
+        size_t currentPartSize = std::min(part_size, fileSize - i * part_size);
+        file.read(buffer.data(), currentPartSize);
+        std::string partFilename = filePath + ".part" + std::to_string(i + 1);
+        std::ofstream partFile(partFilename, std::ios::binary);
+        partFile.write(buffer.data(), currentPartSize);
+        partFile.close();
+        dpp::message msg;
+        msg.add_file(partFilename, dpp::utility::read_file(partFilename));
+        bot.message_create(msg, [&bot, partFilename](const dpp::confirmation_callback_t& callback) {
+            if (callback.is_error()) {
+                std::cerr << "Error uploading part: " << callback.get_error().message << std::endl;
+            }
+            std::filesystem::remove(partFilename);
+            });
+        printProgressBar(i + 1, totalParts);
+    }
+    file.close();
+}
+// splits the selected file and sends it
+void mergeFiles(dpp::cluster& bot, const std::string& linksFileName) {
+    std::ifstream linksFile(linksFileName);
+    if (!linksFile) {
+        std::cerr << "Error: Could not open links file: " << linksFileName << std::endl;
         return;
     }
-    if (!std::getline(linkler_dosyasi, hash)) {
-        std::cerr << "Hash could not be read!" << std::endl;
+    int totalParts = 0;
+    std::string hash;
+    std::string line;
+    std::string targetFileName;
+    std::string webhook;
+    std::vector<Link> links;
+    if (std::getline(linksFile, line)) {
+        try {
+            totalParts = std::stoi(line);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Error: Could not read total parts: " << e.what() << std::endl;
+            return;
+        }
+    }
+    if (!std::getline(linksFile, targetFileName)) {
+        std::cerr << "Error: Could not read target file name!" << std::endl;
         return;
     }
-    if (!std::getline(linkler_dosyasi, webhook)) {
-        std::cerr << "Webhook could not be read!" << std::endl;
+    if (!std::getline(linksFile, hash)) {
+        std::cerr << "Error: Could not read hash!" << std::endl;
         return;
     }
-    while (std::getline(linkler_dosyasi, line)) {
-        int parca_numarasi;
+    if (!std::getline(linksFile, webhook)) {
+        std::cerr << "Error: Could not read webhook!" << std::endl;
+        return;
+    }
+    while (std::getline(linksFile, line)) {
+        int partNumber;
         std::string channelId, messageId;
         json json_obj = json::parse(line);
-        cout << json_obj << endl;
-
         messageId = json_obj["messageId"];
         channelId = json_obj["channelId"];
-        parca_numarasi = json_obj["partNo"];
-        linkler.push_back({ parca_numarasi, channelId, messageId });
+        partNumber = json_obj["partNo"];
+        links.push_back({ partNumber, channelId, messageId });
     }
-    linkler_dosyasi.close();
-
-    // check url size
-    if (linkler.size() != toplam_parca) {
-        cout << "Number of Links: " << linkler.size() << " Number of Parts: " << toplam_parca << endl;
-        std::cerr << "The number of URLs does not match the total number of pieces!" << std::endl;
+    linksFile.close();
+    if (links.size() != totalParts) {
+        std::cerr << "Error: Number of links does not match total parts!" << std::endl;
         return;
     }
-
-    // sort part
-    std::sort(linkler.begin(), linkler.end(), [](const Link& a, const Link& b) {
+    std::sort(links.begin(), links.end(), [](const Link& a, const Link& b) {
         return a.parca_numarasi < b.parca_numarasi;
         });
-
-    // select file
-    std::ofstream hedef_dosya(hedef_dosya_adi, std::ios::binary);
-    if (!hedef_dosya) {
-        std::cerr << "The target file could not be opened: " << hedef_dosya_adi << std::endl;
+    std::ofstream targetFile(targetFileName, std::ios::binary);
+    if (!targetFile) {
+        std::cerr << "Error: Could not open target file: " << targetFileName << std::endl;
         return;
     }
-
-    // start paralel downloading
-    std::vector<std::future<void>> paralel_indirmeler;
-
-    for (const auto& link : linkler) {
+    int downloadedParts = 0;
+    for (const auto& link : links) {
         std::string newFileName = "part" + std::to_string(link.parca_numarasi) + ".txt";
         std::string url = get_file_url(link.channelId, link.messageId);
-        //cout << "Parça: "+ newFileName+"\nUrl: " << url << "\nOda İd: " << link.channelId << "\nMesaj İd: " << link.messageId << endl;
-
-        paralel_indirmeler.push_back(std::async(std::launch::async, [url, newFileName]() {
-            fileDownload(url, newFileName);
-            }));
+        fileDownload(url, newFileName);
+        downloadedParts++;
+        printProgressBar(downloadedParts, totalParts);
     }
-
-    // wait for downloads
-    for (auto& indirme : paralel_indirmeler) {
-        indirme.get();
-    }
-
-    // Assembling the downloaded parts
-    for (const auto& link : linkler) {
+    int mergedParts = 0;
+    for (const auto& link : links) {
         std::string newFileName = "part" + std::to_string(link.parca_numarasi) + ".txt";
-        std::ifstream parca_dosyasi(newFileName, std::ios::binary);
-        if (parca_dosyasi) {
-            hedef_dosya << parca_dosyasi.rdbuf();
-            parca_dosyasi.close();
-            std::cout << newFileName << " merged." << std::endl;
+        std::ifstream partFile(newFileName, std::ios::binary);
+        if (partFile) {
+            targetFile << partFile.rdbuf();
+            partFile.close();
+            mergedParts++;
+            printProgressBar(mergedParts, totalParts);
         }
         else {
-            std::cerr << "The part could not be opened: " << newFileName << std::endl;
+            std::cerr << "Error: Could not open part file: " << newFileName << std::endl;
         }
-
-        // Parça dosyasını siliyoruz
         if (std::remove(newFileName.c_str()) != 0) {
-            std::cerr << "Error deleting a track file: " << newFileName << std::endl;
+            std::cerr << "Error: Could not delete part file: " << newFileName << std::endl;
         }
     }
-
-    hedef_dosya.close();
-
-    // check the hash of the generated file
-    if (getFileHash(hedef_dosya_adi) != hash) {
-        std::cout << "\033[1;31mThe hashes of the created file and the uploaded file do not match!" << std::endl;
-    }
-    else {
-        std::cout << "\033[1;31mThe hashes of the created file and the uploaded file are the same!" << std::endl;
+    targetFile.close();
+    if (getFileHash(targetFileName) != hash) {
+        std::cerr << "Error: File hash mismatch! The downloaded file may be corrupted." << std::endl;
     }
 }
 // downloads and merges selected files and then deletes temporary files
@@ -780,7 +751,7 @@ int main() {
         bot.start(dpp::st_wait);
         });
     while (true) {
-        cout << "\033[1;31mProgram Owner Kerem Kuyucu.\033[1;33m Github: Keremlolgg\n";
+        cout << "\033[1;31mProgram owner is Kerem Kuyucu.\033[1;33m Github: Keremlolgg/DiscordStorage\n";
         cout << "\033[1;34m-----------------------------------------------------------------------" << endl;
         cout << "\033[1;33mPlease enter 'Backup', 'Download' or 'upload-error-file':" << endl;
         cout << "1. Backup" << endl;
