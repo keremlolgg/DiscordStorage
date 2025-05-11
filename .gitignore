@@ -12,5 +12,7 @@ public/
 * /config.json
 * config.json
 DiscordStorage/config.json
-/postlog.txt
+* /postlog.txt
+* postlog.txt
+DiscordStorage/postlog.txt
 *.vscode
