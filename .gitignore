@@ -9,6 +9,8 @@ public/
 *.pdb
 *.ipch
 /.vs/
-/config.json
+* /config.json
+* config.json
+DiscordStorage/config.json
 /postlog.txt
 *.vscode
