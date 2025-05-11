@@ -51,7 +51,7 @@ vector<FileData> files = {
     {"https://github.com/KeremKuyucu/DiscordStorage/raw/refs/heads/main/AppFiles/libssl-1_1-x64.dll",     "libssl-1_1-x64.dll", 0, 686080},
     {"https://github.com/KeremKuyucu/DiscordStorage/raw/refs/heads/main/AppFiles/opus.dll",               "opus.dll", 0, 395776},
     {"https://github.com/KeremKuyucu/DiscordStorage/raw/refs/heads/main/AppFiles/zlib1.dll",              "zlib1.dll", 0, 87040},
-    {"https://github.com/KeremKuyucu/DiscordStorage/raw/refs/heads/main/AppFiles/DiscordStorage.exe",     "discordStorage.exe", checkVersions(), 0},
+    {"https://github.com/KeremKuyucu/DiscordStorage/raw/refs/heads/main/AppFiles/DiscordStoragemain.exe", "discordStoragemain.exe", checkVersions(), 0},
     {"https://github.com/KeremKuyucu/DiscordStorage/raw/refs/heads/main/AppFiles/latestversion.txt",      "localVersion.txt", checkVersions(), 0}
 };
 
@@ -99,7 +99,7 @@ int main() {
         cout << "\033[1;32mconfig.json file exists.\033[0m" << endl;
     }
 
-    int result = system("discordStorage.exe");
+    int result = system("discordStoragemain.exe");
     if (result != 0) {
         cout << "\033[1;33mIf the application does not start,\n"
             << "\033[1;34mGo to C:\\Users\\Public\\Documents\\discordStorage\033[1;33m and try running "
