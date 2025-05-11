@@ -6,11 +6,15 @@
 #include <CURL/curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <dpp/dpp.h>
+#include <windows.h>
+#include <shellapi.h>
+#include <filesystem>
 using namespace std;
 using namespace dpp;
+namespace fs = std::filesystem;
 size_t fileSize = 8;
 size_t part_size = 8 * 1024 * 1024;
-string channelId, messageId, createdWebhook, guild_id, category_id;
+string channelId, messageId, createdWebhook, guild_id, category_id, droppedFilePath = "";
 using json = nlohmann::json;
 
 json parseConfigFile() {
@@ -68,50 +72,65 @@ size_t write_data(void* buf, size_t size, size_t nmemb, FILE* userp) {
 }
 // libcurl 
 std::string getFileHash(const std::string& filename) {
-    std::string command = "CertUtil -hashfile \"" + filename + "\" SHA256";
-    SECURITY_ATTRIBUTES sa{ sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-    HANDLE hRead, hWrite;
+    try {
+        std::string command = "CertUtil -hashfile \"" + filename + "\" SHA256";
+        SECURITY_ATTRIBUTES sa{ sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+        HANDLE hRead = NULL, hWrite = NULL;
 
-    if (!CreatePipe(&hRead, &hWrite, &sa, 0)) return "";
+        if (!CreatePipe(&hRead, &hWrite, &sa, 0)) {
+            std::cerr << "Error: Failed to create pipe.\n";
+            return "";
+        }
 
-    STARTUPINFOA si{};
-    PROCESS_INFORMATION pi{};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdOutput = hWrite;
-    si.hStdError = hWrite;
+        STARTUPINFOA si{};
+        PROCESS_INFORMATION pi{};
+        si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdOutput = hWrite;
+        si.hStdError = hWrite;
 
-    if (!CreateProcessA(NULL, const_cast<char*>(command.c_str()), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        if (!CreateProcessA(NULL, const_cast<char*>(command.c_str()), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+            CloseHandle(hWrite);
+            CloseHandle(hRead);
+            std::cerr << "Error: Failed to run CertUtil.\n";
+            return "";
+        }
+
         CloseHandle(hWrite);
+
+        char buffer[256];
+        std::string output;
+        DWORD bytesRead;
+
+        while (ReadFile(hRead, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead) {
+            buffer[bytesRead] = '\0';
+            output += buffer;
+        }
+
         CloseHandle(hRead);
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+
+        // Satır satır ayır ve ikinci satırı al
+        std::istringstream stream(output);
+        std::string line;
+        int lineNo = 0;
+        while (std::getline(stream, line)) {
+            if (++lineNo == 2) {
+                // Satırda boşluk varsa kaldır
+                line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
+                return line;
+            }
+        }
+
+        std::cerr << "Error: Could not extract hash from CertUtil output.\n";
         return "";
     }
-
-    CloseHandle(hWrite);
-    char buffer[128];
-    std::string result;
-    DWORD bytesRead;
-
-    while (ReadFile(hRead, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead) {
-        buffer[bytesRead] = '\0';
-        result += buffer;
+    catch (const std::exception& e) {
+        std::cerr << "Exception occurred while getting file hash: " << e.what() << std::endl;
+        return "";
     }
-
-    CloseHandle(hRead);
-    WaitForSingleObject(pi.hProcess, INFINITE);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-
-    // Extract hash value from CertUtil output
-    size_t start = result.find("\n");
-    if (start != std::string::npos) {
-        start = result.find("\n", start + 1);
-        if (start != std::string::npos) {
-            size_t end = result.find("\n", start + 1);
-            return result.substr(start + 1, end - start - 1);
-        }
-    }
-    return "";
 }
 // hash calculation
 std::pair<std::string, std::string> id_bul(const std::string& json_str) {
@@ -319,7 +338,6 @@ void createChannel(dpp::cluster& bot, const std::string& channel_name, const std
         });
 }
 // create channel
-
 std::vector<std::string> fileList(const std::string& yol) {
     std::vector<std::string> files;
     // Set of files to exclude
@@ -414,13 +432,14 @@ void fileUpload(const std::string& webhook_url, const std::string& filePath, con
             std::cerr << "File sending error: " << curl_easy_strerror(res) << std::endl;
         }
         else {
-            std::cout << "\033[1;31m" << filePath << " Successfully dispatched!" << std::endl;
+            //std::cout << "\033[1;31m" << filePath << " Successfully dispatched!" << std::endl;
 
             if (silme) {
                 if (std::remove(filePath.c_str()) != 0) {
                     std::cerr << "File deletion error: " << filePath << std::endl;
                 }
             }
+
             std::ofstream dosya2("postlog.txt", std::ios::app);
             dosya2 << "Webhook Response: " << response.data << std::endl;
             dosya2.close();
@@ -429,7 +448,7 @@ void fileUpload(const std::string& webhook_url, const std::string& filePath, con
                 if (silme == 1) {
                     std::ofstream dosya2(linkleridosyasi, std::ios::app);
                     dosya2 << json_write(parca_no, channelId2, messageId2) << std::endl;
-                    cout << json_write(parca_no, channelId2, messageId2) << endl;
+                    //cout << json_write(parca_no, channelId2, messageId2) << endl;
                     dosya2.close();
                 }
                 else {
@@ -482,32 +501,36 @@ int fileDownload(const std::string& url, const std::string& dosya_adi) {
     return 0;
 }
 // file download
-void chooseFile(dpp::cluster& bot, const std::vector<std::string>& yerel_dosyalar, const std::vector<dpp::snowflake>& cloudFiles, std::string& filePath) {
+void chooseFile(dpp::cluster& bot, std::string& filePath) {
+    std::vector<std::string> yerel_dosyalar = fileList(".");
+    std::vector<dpp::snowflake> cloudFiles;
+    get_cloud_files(bot, guild_id, category_id, cloudFiles);
+    
     while (true) {
         std::cout << "\033[1;33mAvailable files:\033[0m" << std::endl;
 
         // Yerel dosyalar
-        std::cout << "\033[1;34mLocal Files:\033[0m" << std::endl;
-        for (size_t i = 0; i < yerel_dosyalar.size(); ++i) {
-            std::cout << i + 1 << ". " << yerel_dosyalar[i] << std::endl;
-        }
+            std::cout << "\033[1;34mLocal Files:\033[0m" << std::endl;
+            for (size_t i = 0; i < yerel_dosyalar.size(); ++i) {
+                std::cout << i + 1 << ". " << yerel_dosyalar[i] << std::endl;
+            }
 
         // Buluttaki dosyalar
-        std::cout << "\033[1;34mFiles in the Cloud:\033[0m" << std::endl;
-        for (size_t i = 0; i < cloudFiles.size(); ++i) {
-            string obj = get_messages(bot, cloudFiles[i], 1);
+            std::cout << "\033[1;34mFiles in the Cloud:\033[0m" << std::endl;
+            for (size_t i = 0; i < cloudFiles.size(); ++i) {
+                string obj = get_messages(bot, cloudFiles[i], 1);
 
-            // JSON formatında olup olmadığını kontrol et
-            try {
-                json json_obj = json::parse(obj);
-                std::cout << i + 1 + yerel_dosyalar.size() << ". " << json_obj["fileName"] << std::endl;
+                // JSON formatında olup olmadığını kontrol et
+                try {
+                    json json_obj = json::parse(obj);
+                    std::cout << i + 1 + yerel_dosyalar.size() << ". " << json_obj["fileName"] << std::endl;
+                }
+                catch (const json::parse_error& e) {
+                    // JSON formatında değilse, hata ver ve geç
+                    std::cout << "\033[1;31mThe file in the cloud is not in JSON format, it is passed...\033[0m" << std::endl;
+                    continue;  // JSON hatası alırsak bu öğeyi atla
+                }
             }
-            catch (const json::parse_error& e) {
-                // JSON formatında değilse, hata ver ve geç
-                std::cout << "\033[1;31mThe file in the cloud is not in JSON format, it is passed...\033[0m" << std::endl;
-                continue;  // JSON hatası alırsak bu öğeyi atla
-            }
-        }
 
         std::cout << "\033[1;34m-----------------------------------------------------------------------" << std::endl;
         std::cout << "\033[1;33mPlease make your selection (enter number):\033[0m" << std::endl;
@@ -565,76 +588,166 @@ void chooseFile(dpp::cluster& bot, const std::vector<std::string>& yerel_dosyala
     }
 }
 // selects a file, makes file_path the name of the selected file
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_DROPFILES: {
+        HDROP hDrop = (HDROP)wParam;
+        char filePath[MAX_PATH];
+        DragQueryFileA(hDrop, 0, filePath, MAX_PATH);
+        DragFinish(hDrop);
+        droppedFilePath = filePath;
+        PostMessage(hwnd, WM_CLOSE, 0, 0); // pencereyi kapat
+        break;
+    }
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+std::string openDragDropWindow() {
+    const char CLASS_NAME[] = "DragDropWindowClass";
+
+    WNDCLASSA wc = {};
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = GetModuleHandle(NULL);
+    wc.lpszClassName = CLASS_NAME;
+
+    RegisterClassA(&wc);
+
+    HWND hwnd = CreateWindowExA(
+        0, CLASS_NAME, "Dosyayı buraya sürükleyin",
+        WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+        CW_USEDEFAULT, CW_USEDEFAULT, 500, 200,
+        NULL, NULL, GetModuleHandle(NULL), NULL
+    );
+
+    DragAcceptFiles(hwnd, TRUE);
+
+    ShowWindow(hwnd, SW_SHOW);
+
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return droppedFilePath;
+}
+// select a file, with windows api
 
 void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t part_size = 8 * 1024 * 1024) {
+    std::string fileName = fs::path(filePath).filename().string();
     std::string links_txt = filePath + "_links.txt";
-    int availablePartNumber = 0;
-    std::string hash;
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file) {
-        std::cerr << "Error: Could not open file: " << filePath << std::endl;
-        return;
-    }
-    file.seekg(0, std::ios::end);
-    size_t fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
-    size_t totalParts = static_cast<size_t>((fileSize + part_size - 1) / part_size);
-    std::ifstream control(links_txt);
-    if (control) {
-        std::string lastLine;
-        getline(control, lastLine);
-        getline(control, lastLine);
-        getline(control, hash);
-        getline(control, lastLine);
-        if (hash == getFileHash(filePath)) {
-            while (std::getline(control, lastLine)) {
-                json json_obj = json::parse(lastLine);
-                availablePartNumber = json_obj["part_no"];
-            }
+    try {
+        int availablePartNumber = 0;
+        std::string hash;
+
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file) {
+            std::cerr << "Error: Could not open file: " << filePath << std::endl;
+            return;
         }
-        else {
-            std::cerr << "Error: A different file with the same name detected. Please delete or move the other file." << std::endl;
+
+        file.seekg(0, std::ios::end);
+        size_t fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+        size_t totalParts = static_cast<size_t>((fileSize + part_size - 1) / part_size);
+
+        std::ifstream control(links_txt);
+        if (control) {
+            std::string lastLine;
+            getline(control, lastLine);
+            getline(control, lastLine);
+            getline(control, hash);
+            getline(control, createdWebhook);
+            if (hash == getFileHash(filePath)) {
+                while (std::getline(control, lastLine)) {
+                    try {
+                        json json_obj = json::parse(lastLine);
+                        availablePartNumber = json_obj["partNo"];
+                    }
+                    catch (const std::exception& e) {
+                        std::cerr << "JSON parsing error in links file: " << e.what() << std::endl;
+                        continue;
+                    }
+                }
+            }
+            else {
+                std::cerr << "Error: A different file with the same name detected. Please delete or move the other file." << std::endl;
+                control.close();
+                file.close();
+                return;
+            }
             control.close();
-            file.close();
-            return;
-        }
-        control.close();
-    }
-    else {
-        createChannel(bot, filePath, guild_id, category_id);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-        std::ofstream file2(links_txt, std::ios::app);
-        if (file2.is_open()) {
-            file2 << totalParts << std::endl;
-            file2 << filePath << std::endl;
-            file2 << getFileHash(filePath) << std::endl;
-            file2 << createdWebhook << std::endl;
-            file2.close();
         }
         else {
-            std::cerr << "Error: Could not create links file: " << links_txt << std::endl;
-            return;
-        }
-    }
-    std::vector<char> buffer(part_size);
-    for (size_t i = 0; i < totalParts; ++i) {
-        size_t currentPartSize = std::min(part_size, fileSize - i * part_size);
-        file.read(buffer.data(), currentPartSize);
-        std::string partFilename = filePath + ".part" + std::to_string(i + 1);
-        std::ofstream partFile(partFilename, std::ios::binary);
-        partFile.write(buffer.data(), currentPartSize);
-        partFile.close();
-        dpp::message msg;
-        msg.add_file(partFilename, dpp::utility::read_file(partFilename));
-        bot.message_create(msg, [&bot, partFilename](const dpp::confirmation_callback_t& callback) {
-            if (callback.is_error()) {
-                std::cerr << "Error uploading part: " << callback.get_error().message << std::endl;
+            createChannel(bot, filePath, guild_id, category_id);
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+
+            std::ofstream file2(links_txt, std::ios::app);
+            if (file2.is_open()) {
+                file2 << totalParts << std::endl;
+                file2 << fileName << std::endl;
+                file2 << getFileHash(filePath) << std::endl;
+                file2 << createdWebhook << std::endl;
+                file2.close();
             }
-            std::filesystem::remove(partFilename);
-            });
-        printProgressBar(i + 1, totalParts);
+            else {
+                std::cerr << "Error: Could not create links file: " << links_txt << std::endl;
+                return;
+            }
+        }
+
+        std::vector<char> buffer(part_size);
+        for (size_t i = availablePartNumber; i < totalParts; ++i) {
+            size_t currentPartSize = std::min(part_size, fileSize - i * part_size);
+            file.read(buffer.data(), currentPartSize);
+            std::string partFilename = filePath + ".part" + std::to_string(i + 1);
+
+            std::ofstream partFile(partFilename, std::ios::binary);
+            partFile.write(buffer.data(), currentPartSize);
+            partFile.close();
+
+            std::string mesaj = "File part: " + std::to_string(i + 1);
+            fileUpload(createdWebhook, partFilename, i + 1, mesaj, 1, links_txt);
+
+            printProgressBar(i + 1, totalParts);
+        }
+        file.close();
     }
-    file.close();
+    catch (const std::exception& e) {
+        std::cerr << "\033[1;31mException caught in splitFileandUpload: " << e.what() << "\033[0m" << std::endl;
+    }
+
+    std::string message1 =
+        fileName + "'s download links\n"
+        "```\n"
+        "File Meaning:\n"
+        "1. Line : Total Number of Parts\n"
+        "Line 2 : File Name\n"
+        "Line 3 : Hash Value of File\n"
+        "Line 4 : Webhook Link\n"
+        "Next Lines : Track Number, Room Id, Message Id\n"
+        "```";
+    fileUpload(createdWebhook, links_txt, 0, message1, 0, links_txt);
+
+    json message2 = {
+        {"channelId", channelId},
+        {"fileName", fileName},
+        {"messageId", messageId}
+    };
+    std::string messageString = message2.dump();
+    dpp::webhook wh(createdWebhook);
+    bot.execute_webhook(wh, dpp::message(messageString));
+
+    cout << "\033[1;34mDon't write a message in the room.\033[0m" << endl;
+    cout << "\033[1;33mIf there is a part that is not deleted, it may not be loaded, please check that part and manually\nload it and add the partoda and message id where it should be.\033[0m" << endl;
+    cout << "\033[1;33mPlease do not keep this backup as the only backup of the file, but as an alternative.\033[0m" << endl;
+    cout << "\033[1;34mAs they say: If your data is not in three places, it does not exist.\033[0m" << endl;
+    cout << "\033[1;31m-----------------------------------------------------------------------" << endl;
 }
 // splits the selected file and sends it
 void mergeFiles(dpp::cluster& bot, const std::string& linksFileName) {
@@ -724,6 +837,7 @@ void mergeFiles(dpp::cluster& bot, const std::string& linksFileName) {
 }
 // downloads and merges selected files and then deletes temporary files
 
+
 int main() {
     setlocale(LC_ALL, "Turkish");
     string input = "";
@@ -750,6 +864,7 @@ int main() {
     std::thread bot_thread([&bot]() {
         bot.start(dpp::st_wait);
         });
+
     while (true) {
         cout << "\033[1;31mProgram owner is Kerem Kuyucu.\033[1;33m Github: Keremlolgg/DiscordStorage\n";
         cout << "\033[1;34m-----------------------------------------------------------------------" << endl;
@@ -770,32 +885,22 @@ int main() {
             string filePath;
             cout << "\033[1;34mPlease encrypt sensitive data before uploading for your security.\033[0m" << endl;
             cout << "\033[1;33mPlease select the file you want to upload.\033[0m" << endl;
-            vector<string> files = fileList(".");
             cout << "\033[1;33mPlease wait one second.\033[0m" << endl;
             std::this_thread::sleep_for(std::chrono::seconds(1));
-            chooseFile(bot, files, cloudFiles, filePath);
+            //chooseFile(bot, filePath,false);
+            filePath = openDragDropWindow();
+            cout << filePath << endl;
             if (!filePath.empty()) {
                 splitFileandUpload(filePath, bot);
-                cout << "\n\n\n\n\n";
-                cout << "\033[1;33mPlease save the file " + filePath + "_links.txt.With that file you can download your file again.\033[0m" << endl;
-                cout << "\033[1;34mDon't write a message in the room.\033[0m" << endl;
-                cout << "\033[1;33mIf there is a part that is not deleted, it may not be loaded, please check that part and manually\nload it and add the partoda and message id where it should be.\033[0m" << endl;
-                cout << "\033[1;33mPlease do not keep this backup as the only backup of the file, but as an alternative.\033[0m" << endl;
-                cout << "\033[1;34mNe Demişler: Veriniz üç yerde yoksa o veri yok demektir.\033[0m" << endl;
-                cout << "\033[1;34mAs they say: If your data is not in three places, it does not exist.\033[0m" << endl;
-                cout << "\033[1;31m-----------------------------------------------------------------------" << endl;
             }
         }
         else if (input == "2") {
             // İndirme işlemleri
             string filePath;
             cout << "\033[1;33mPlease select the file \"filename\"_links.txt.\033[0m" << endl;
-            vector<string> files = fileList(".");
-            get_cloud_files(bot, guild_id, category_id, cloudFiles);
             cout << "\033[1;33mPlease wait one second.\033[0m" << endl;
             std::this_thread::sleep_for(std::chrono::seconds(1));
-            chooseFile(bot, files, cloudFiles, filePath);
-
+            chooseFile(bot,filePath);
             if (!filePath.empty()) {
                 mergeFiles(bot, filePath);
                 cout << "\033[1;31mFile downloaded!" << endl;
@@ -807,11 +912,11 @@ int main() {
             cout << "Please enter a webhook link to upload the faulty file: (Please create an error file room and create a webhook link from there.)" << endl;
             getline(cin, hataliwebhook);
             cout << "Please select the incorrect file." << endl;
-            vector<string> files = fileList(".");
-            get_cloud_files(bot, guild_id, category_id, cloudFiles);
             cout << "\033[1;33mPlease wait one second.\033[0m" << endl;
             std::this_thread::sleep_for(std::chrono::seconds(1));
-            chooseFile(bot, files, cloudFiles, filePath);
+            //chooseFile(bot, filePath);
+            filePath = openDragDropWindow();
+            cout << filePath << endl;
             fileUpload(hataliwebhook, filePath, 1, filePath + " ", 0, "postlog.txt");
         }
     }

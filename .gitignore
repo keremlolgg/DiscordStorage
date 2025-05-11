@@ -8,3 +8,4 @@ obj/
 /.vs/
 /config.json
 /postlog.txt
+* .vscode

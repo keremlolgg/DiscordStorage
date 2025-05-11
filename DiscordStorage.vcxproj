@@ -65,6 +65,7 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Public\Özellik.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -105,6 +106,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -129,6 +131,21 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Public\bin\dpp.dll" />
+    <None Include="..\Public\bin\libcrypto-1_1-x64.dll" />
+    <None Include="..\Public\bin\libcurl-x64.dll" />
+    <None Include="..\Public\bin\libsodium.dll" />
+    <None Include="..\Public\bin\libssl-1_1-x64.dll" />
+    <None Include="..\Public\bin\openal32.dll" />
+    <None Include="..\Public\bin\opus.dll" />
+    <None Include="..\Public\bin\sfml-audio-2.dll" />
+    <None Include="..\Public\bin\sfml-graphics-2.dll" />
+    <None Include="..\Public\bin\sfml-network-2.dll" />
+    <None Include="..\Public\bin\sfml-system-2.dll" />
+    <None Include="..\Public\bin\sfml-window-2.dll" />
+    <None Include="..\Public\bin\zlib1.dll" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

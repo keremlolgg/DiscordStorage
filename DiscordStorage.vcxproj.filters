@@ -19,4 +19,45 @@
       <Filter>Kaynak Dosyaları</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Public\bin\dpp.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\libcrypto-1_1-x64.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\libcurl-x64.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\libsodium.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\libssl-1_1-x64.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\openal32.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\opus.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\sfml-audio-2.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\sfml-graphics-2.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\sfml-network-2.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\sfml-system-2.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\sfml-window-2.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+    <None Include="..\Public\bin\zlib1.dll">
+      <Filter>Kaynak Dosyalar</Filter>
+    </None>
+  </ItemGroup>
 </Project>
