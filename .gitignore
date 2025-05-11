@@ -1,11 +1,14 @@
 obj/
 .vs/
 .obj/
-* .vsidx
-* .db
-* .pdb
-* .ipch
+public/
+.public/
+/public/
+*.vsidx
+*.db
+*.pdb
+*.ipch
 /.vs/
 /config.json
 /postlog.txt
-* .vscode
+*.vscode
