@@ -3,6 +3,8 @@
 #include <iostream>
 #include <locale>
 #include <regex>
+#include <future>
+#include <thread>
 #include <CURL/curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <dpp/dpp.h>
@@ -14,7 +16,7 @@ using namespace dpp;
 namespace fs = std::filesystem;
 size_t fileSize = 8;
 size_t part_size = 8 * 1024 * 1024;
-string channelId, messageId, createdWebhook, guild_id, category_id, droppedFilePath = "";
+string channelId, messageId, createdWebhook, guild_id, category_id, droppedFilePath, filePath;
 using json = nlohmann::json;
 
 json parseConfigFile() {
@@ -92,7 +94,7 @@ std::string openDragDropWindow() {
     RegisterClassA(&wc);
 
     HWND hwnd = CreateWindowExA(
-        0, CLASS_NAME, "Dosyayı buraya sürükleyin",
+        0, CLASS_NAME, "Drag the file here",
         WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
         CW_USEDEFAULT, CW_USEDEFAULT, 500, 200,
         NULL, NULL, GetModuleHandle(NULL), NULL
@@ -547,51 +549,13 @@ std::string getFileHash(const std::string& filename) {
     }
 }
 // hash calculation
-std::vector<std::string> fileList(const std::string& yol) {
-    std::vector<std::string> files;
-    // Set of files to exclude
-    std::set<std::string> dissmissFiles = {
-        "config.json",
-        "DiscordDepolama.exe",
-        "DiscordStorage.exe",
-        "dpp.dll",
-        "libcrypto-1_1-x64.dll",
-        "libcurl-x64.dll",
-        "libsodium.dll",
-        "libssl-1_1-x64.dll",
-        "opus.dll",
-        "zlib1.dll",
-        //debug is bothering for
-        "DiscordStorage.sln",
-        "DiscordStorage.vcxproj",
-        "DiscordStorage.vcxproj.filters",
-        "DiscordStorage.vcxproj.user",
-        "postlog.txt",
-        "Main.cpp",
-        "LICENSE",
-        "git",
-        ".gitignore",
-        "README.md",
-        "Özellik.props"
-    };
-
-    for (const auto& entry : std::filesystem::directory_iterator(yol)) {
-        if (entry.is_regular_file()) {
-            std::string dosya_adi = entry.path().filename().string();
-            // If we don't find the filename in the set of files to exclude, add it
-            if (dissmissFiles.find(dosya_adi) == dissmissFiles.end()) {
-                files.push_back(dosya_adi);
-            }
-        }
-    }
-    return files;
-}
-// local files list
-void get_cloud_files(dpp::cluster& bot, const std::string& guild_id, const std::string& category_id, std::vector<dpp::snowflake>& cloudFiles) {
+void get_cloud_files(dpp::cluster& bot, std::vector<dpp::snowflake>& cloudFiles, std::promise<void>& promise) {
     cloudFiles.clear();
-    bot.channels_get(guild_id, [&bot, category_id, &cloudFiles](const dpp::confirmation_callback_t& callback) {
+
+    bot.channels_get(guild_id, [&bot, &cloudFiles, &promise](const dpp::confirmation_callback_t& callback) {
         if (callback.is_error()) {
             std::cerr << "Error receiving channels: " << callback.get_error().message << std::endl;
+            promise.set_exception(std::make_exception_ptr(std::runtime_error("Error receiving channels")));
             return;
         }
 
@@ -601,32 +565,33 @@ void get_cloud_files(dpp::cluster& bot, const std::string& guild_id, const std::
                 cloudFiles.push_back(channel.id);
             }
         }
+
+        // İşlem tamamlandığında promise'in set edilmesi
+        promise.set_value();
         });
 }
 // cloud files list
 void chooseFile(dpp::cluster& bot, std::string& filePath) {
-    std::vector<std::string> yerel_dosyalar = fileList(".");
     std::vector<dpp::snowflake> cloudFiles;
-    get_cloud_files(bot, guild_id, category_id, cloudFiles);
+    std::promise<void> promise;
+    std::future<void> future = promise.get_future();
+
+    std::thread getFilesThread([&bot, &cloudFiles, &promise]() {
+        get_cloud_files(bot, cloudFiles, promise);
+        });
+    future.get();
 
     while (true) {
         std::cout << "\033[1;33mAvailable files:\033[0m" << std::endl;
-
-        // Yerel dosyalar
-        std::cout << "\033[1;34mLocal Files:\033[0m" << std::endl;
-        for (size_t i = 0; i < yerel_dosyalar.size(); ++i) {
-            std::cout << i + 1 << ". " << yerel_dosyalar[i] << std::endl;
-        }
 
         // Buluttaki dosyalar
         std::cout << "\033[1;34mFiles in the Cloud:\033[0m" << std::endl;
         for (size_t i = 0; i < cloudFiles.size(); ++i) {
             string obj = get_messages(bot, cloudFiles[i], 1);
-
             // JSON formatında olup olmadığını kontrol et
             try {
                 json json_obj = json::parse(obj);
-                std::cout << i + 1 + yerel_dosyalar.size() << ". " << json_obj["fileName"] << std::endl;
+                std::cout << i + 1 << ". " << json_obj["fileName"] << std::endl;
             }
             catch (const json::parse_error& e) {
                 // JSON formatında değilse, hata ver ve geç
@@ -642,13 +607,8 @@ void chooseFile(dpp::cluster& bot, std::string& filePath) {
         std::cin >> input;
 
         // Selection control
-        if (input > 0 && input <= static_cast<int>(yerel_dosyalar.size() + cloudFiles.size())) {
-            if (input <= static_cast<int>(yerel_dosyalar.size())) {
-                filePath = yerel_dosyalar[input - 1];
-            }
-            else {
-                string obj = get_messages(bot, cloudFiles[input - 1 - yerel_dosyalar.size()], 1);
-
+        if (input > 0 && input <= cloudFiles.size()) {
+                string obj = get_messages(bot, cloudFiles[input - 1], 1);
                 // We expect it to be in JSON format, but let's check this again
                 try {
                     json data = json::parse(obj);
@@ -663,7 +623,7 @@ void chooseFile(dpp::cluster& bot, std::string& filePath) {
                         std::cout << "File downloaded successfully: " << downloadingFile << std::endl;
 
                         // Read the second line and set the file name
-                        std::string newFileName = get_second_line(downloadingFile);
+                        string newFileName = get_second_line(downloadingFile);
                         if (!newFileName.empty()) {
                             newFileName += ".txt"; // Add file extension
                             rename(downloadingFile.c_str(), newFileName.c_str()); // Change file name
@@ -682,7 +642,6 @@ void chooseFile(dpp::cluster& bot, std::string& filePath) {
                     std::cout << "\033[1;31mThe cloud file is not in JSON format, it is being passed...\033[0m" << std::endl;
                     continue;  // JSON hatası alırsak bu dosyayı atla
                 }
-            }
             break;
         }
         else {
@@ -756,7 +715,7 @@ void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t p
             control.close();
         }
         else {
-            createChannel(bot, filePath, guild_id, category_id);
+            createChannel(bot, fileName, guild_id, category_id);
             std::this_thread::sleep_for(std::chrono::seconds(3));
 
             std::ofstream file2(links_txt, std::ios::app);
@@ -957,11 +916,8 @@ int main() {
 
         if (input == "1") {
             // Upload
-            string filePath;
             cout << "\033[1;34mPlease encrypt sensitive data before uploading for your security.\033[0m" << endl;
             cout << "\033[1;33mPlease select the file you want to upload.\033[0m" << endl;
-            cout << "\033[1;33mPlease wait one second.\033[0m" << endl;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
             filePath = openDragDropWindow();
             cout << filePath << endl;
             if (!filePath.empty()) {
@@ -970,10 +926,6 @@ int main() {
         }
         else if (input == "2") {
             // Download
-            string filePath;
-            cout << "\033[1;33mPlease select the file \"filename\"_links.txt.\033[0m" << endl;
-            cout << "\033[1;33mPlease wait one second.\033[0m" << endl;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
             chooseFile(bot,filePath);
             if (!filePath.empty()) {
                 mergeFiles(bot, filePath);
@@ -983,7 +935,6 @@ int main() {
         else if (input == "3") {
             // Error file upload
             string hataliwebhook;
-            string filePath;
             cout << "Please enter a webhook link to upload the faulty file: (Please create an error file room and create a webhook link from there.)" << endl;
             getline(cin, hataliwebhook);
             cout << "Please select the incorrect file." << endl;
