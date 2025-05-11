@@ -105,5 +105,7 @@ int main() {
             << "\033[1;34mGo to C:\\Users\\Public\\Documents\\discordStorage\033[1;33m and try running "
             << "discordStorage.exe manually.\033[0m\n";
     }
+    string temp;
+    cin >> temp;
     return 0;
 }
