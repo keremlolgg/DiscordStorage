@@ -672,6 +672,13 @@ void printProgressBar(int current, int total, int barWidth = 50) {
 void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t part_size = 8 * 1024 * 1024) {
     std::string fileName = fs::path(filePath).filename().string();
     std::string links_txt = filePath + "_links.txt";
+    std::string tempDir = "C:\\Users\\Public\\Documents\\discordStorage\\temp\\";
+
+    // Temp klasörü yoksa oluştur
+    if (!fs::exists(tempDir)) {
+        fs::create_directories(tempDir);
+    }
+
     try {
         int availablePartNumber = 0;
         std::string hash;
@@ -736,7 +743,7 @@ void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t p
         for (size_t i = availablePartNumber; i < totalParts; ++i) {
             size_t currentPartSize = std::min(part_size, fileSize - i * part_size);
             file.read(buffer.data(), currentPartSize);
-            std::string partFilename = filePath + ".part" + std::to_string(i + 1);
+            std::string partFilename = tempDir + fileName + ".part" + std::to_string(i + 1);
 
             std::ofstream partFile(partFilename, std::ios::binary);
             partFile.write(buffer.data(), currentPartSize);
@@ -753,7 +760,7 @@ void splitFileandUpload(const std::string& filePath, dpp::cluster& bot, size_t p
         std::cerr << "\033[1;31mException caught in splitFileandUpload: " << e.what() << "\033[0m" << std::endl;
     }
 
-    std::string message1 =
+    string message1 =
         fileName + "'s download links\n"
         "```\n"
         "File Meaning:\n"
@@ -926,10 +933,25 @@ int main() {
         }
         else if (input == "2") {
             // Download
-            chooseFile(bot,filePath);
+            cout << "\033[1;33mSelect file source:\n filename_link.txt Or Cloud Save\nYour choice: \033[0m";
+            string sourceInput;
+            getline(cin, sourceInput);
+
+            if (sourceInput == "1") {
+                chooseFile(bot, filePath); // Select from filename_link.txt
+            }
+            else if (sourceInput == "2") {
+                filePath = openDragDropWindow(); // Select local file
+            }
+            else {
+                cout << "\033[1;31mInvalid choice.\033[0m" << endl;
+            }
             if (!filePath.empty()) {
                 mergeFiles(bot, filePath);
-                cout << "\033[1;31mFile downloaded!" << endl;
+                cout << "\033[1;32mFile downloaded successfully!\033[0m" << endl;
+            }
+            else {
+                cout << "\033[1;31mFile path is empty. Operation cancelled.\033[0m" << endl;
             }
         }
         else if (input == "3") {
